@@ -7,14 +7,14 @@ import ..NumIntegrate
 import ..Monomials
 import ..Meshing
 
-function Darcy_setup(mesh,source::Function,p_bdry::Function,μ::Function,k::Int)
+function Darcy_setup(mesh, source::Function, p_bdry::Function, μ::Function, k::Int)
     A = assemble_stiffness_matrix(mesh, k, μ)
-    b = assemble_rhs(mesh,source, k)
+    b = assemble_rhs(mesh, source, k)
 
     # Find dofs related to essential BCs
     bdry_dofs = Meshing.get_bdry_dofs(mesh)[1]
     E_bdry = create_restriction(bdry_dofs)
-    E_0    = create_restriction(.!bdry_dofs)
+    E_0 = create_restriction(.!bdry_dofs)
 
     ξ_bdry = [p_bdry(x) for x in eachrow(E_bdry * mesh.node_coords)]
 
@@ -33,14 +33,14 @@ end
 #-------------- VEM k=1 --------------#
 function element_projection_matrices(mesh, cell, k=1)
 
-    @assert(k==1, "Only implemented k=1")
+    @assert(k == 1, "Only implemented k=1")
     monExps = Monomials.mon_exp(k)
 
     # geometry information
-    coords = mesh.node_coords[mesh.cell_nodes[cell],:]
+    coords = mesh.node_coords[mesh.cell_nodes[cell], :]
     nvx = size(coords, 1) # number of vertices
     d_vec = circshift(coords, 1) - circshift(coords, -1)
-    d_perp = 1/2 * ([0 -1; 1 0] * d_vec')
+    d_perp = 1 / 2 * ([0 -1; 1 0] * d_vec')
 
     h = mesh.cell_diams[cell]
     centroid = mesh.cell_centroids[cell, :]
@@ -52,22 +52,22 @@ function element_projection_matrices(mesh, cell, k=1)
 
     B = [ones(1, nvx) / nvx; gradMon * d_perp]
 
-    G = B*D
+    G = B * D
 
-    PreProj = G\B # As a rule: inv(G)*B is superslow.
-    Proj = D*PreProj
+    PreProj = G \ B # As a rule: inv(G)*B is superslow.
+    Proj = D * PreProj
 
     return Proj, PreProj, G
 end
 
 function element_stiffness_matrix(Proj, PreProj, G)
     Gtilde = copy(G)
-    Gtilde[1,:] .= 0
+    Gtilde[1, :] .= 0
     # TODO: VEM param before (I-Proj)
-    return PreProj'*Gtilde*PreProj + (I-Proj)'*(I-Proj)
+    return PreProj' * Gtilde * PreProj + (I - Proj)' * (I - Proj)
 end
 
-function assemble_stiffness_matrix(mesh, k, μ = x->1)
+function assemble_stiffness_matrix(mesh, k, μ=x -> 1)
 
     I = Int[]
     J = Int[]
@@ -76,7 +76,7 @@ function assemble_stiffness_matrix(mesh, k, μ = x->1)
     for (cell, nodes) in enumerate(mesh.cell_nodes) # Loops over mesh elements
         Proj, PreProj, G = element_projection_matrices(mesh, cell, k)
 
-        if μ(mesh.cell_centroids[cell,:]) != 1
+        if μ(mesh.cell_centroids[cell, :]) != 1
             G = Monomials.scaled_element_stiffness_matrix(mesh, cell, k, μ)
         end
 
@@ -92,21 +92,21 @@ end
 
 function assemble_rhs(mesh, source, k)
 
-    @assert(k==1, "Only implemented k=1: [ADD REASON WHY]")
+    @assert(k == 1, "Only implemented k=1: [ADD REASON WHY]")
 
     I = Int[]
     V = Float64[]
 
     for (cell, nodes) in enumerate(mesh.cell_nodes)
         PreProj = element_projection_matrices(mesh, cell, k)[2]
-        coords = mesh.node_coords[nodes,:]
+        coords = mesh.node_coords[nodes, :]
         pC = mesh.cell_centroids[cell, :]
         h = mesh.cell_diams[cell]
         f_el = zeros(length(nodes))
 
         for i in 1:length(nodes)
-            integrand(x) = source(x) * Monomials.eval_scaled_polynomial(x,PreProj[:,i],pC,h,k)
-            f_el[i] = NumIntegrate.quad_integral_el(coords, integrand, 2*k)
+            integrand(x) = source(x) * Monomials.eval_scaled_polynomial(x, PreProj[:, i], pC, h, k)
+            f_el[i] = NumIntegrate.quad_integral_el(coords, integrand, 2 * k)
         end
 
         append!(I, nodes)
@@ -140,13 +140,13 @@ function loc_proj_L2(coords) # Obsolete?
 
     nvx = size(coords, 1) # number of vertices
     d_vec = circshift(coords, 1) - circshift(coords, -1)
-    d_perp = (1/2 * [0 -1; 1 0] * d_vec')' # 3x2 adjoint
-    @assert(size(d_perp,1)>size(d_perp,2))
+    d_perp = (1 / 2 * [0 -1; 1 0] * d_vec')' # 3x2 adjoint
+    @assert(size(d_perp, 1) > size(d_perp, 2))
 
-    centroid = [sum(coords[:, i])/nvx for i in 1:2]
+    centroid = [sum(coords[:, i]) / nvx for i in 1:2]
     area = get_poly_area(coords)
 
-    proj_collection(x,idx) = 1/(2*area)*dot(x-centroid,d_perp[idx,:])+1/nvx
+    proj_collection(x, idx) = 1 / (2 * area) * dot(x - centroid, d_perp[idx, :]) + 1 / nvx
     return proj_collection
 end
 
@@ -156,20 +156,20 @@ end
 - sol is the true solution in function form
 """
 function norm_L2(mesh, k, vem_dofs, sol::Function)
-    @assert(k==1, "Only implemented k=1")
+    @assert(k == 1, "Only implemented k=1")
 
     sum² = 0
     for (cell, nodes) in enumerate(mesh.cell_nodes)
-        coords = mesh.node_coords[nodes,:]
+        coords = mesh.node_coords[nodes, :]
         pC = mesh.cell_centroids[cell, :]
         h = mesh.cell_diams[cell]
 
         PreProj = element_projection_matrices(mesh, cell, k)[2] # Preproj: projects the VEM space to a subspace
-        polynomial_list = PreProj*vem_dofs[nodes]
+        polynomial_list = PreProj * vem_dofs[nodes]
 
-        vem_sol(x) = Monomials.eval_scaled_polynomial(x,polynomial_list,pC,h,k)
-        
-        integrand(x) = (sol(x)-vem_sol(x))^2
+        vem_sol(x) = Monomials.eval_scaled_polynomial(x, polynomial_list, pC, h, k)
+
+        integrand(x) = (sol(x) - vem_sol(x))^2
 
         sum² += NumIntegrate.quad_integral_el(coords, integrand, 3)
 

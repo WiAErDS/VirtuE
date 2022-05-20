@@ -18,7 +18,7 @@ center = [0.5, 0.5]
 # <0:inside, >0:outside
 levelset(x) = LinearAlgebra.norm(x - center) - radius
 
-mesh, itf_faces = Meshing.remesh(mesh, levelset, get_itf_faces = true)
+mesh, itf_faces = Meshing.remesh(mesh, levelset, get_itf_faces=true)
 
 println("Area ratio before: ", minimum(mesh.cell_areas) / maximum(mesh.cell_areas))
 

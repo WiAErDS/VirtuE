@@ -12,7 +12,7 @@ mesh = Meshing.create_tri_mesh(N)
 # mesh = create_pentagon_mesh()
 
 ##-------------- Remesh wrt levelset --------------#
-radius = 1/sqrt(11) # [1/sqrt(11) gets a REAALLY bad cut]
+radius = 1 / sqrt(11) # [1/sqrt(11) gets a REAALLY bad cut]
 center = [0.5, 0.5]
 # radius = 1/sqrt(2)
 # center = [0, 0]
@@ -33,21 +33,21 @@ k = 0 # Polynomial degree
 # p_sol(x) = p_bdry(x)
 # u_sol(x) = [-1, 0]
 
-source(x) = 40*π^2*sin(2*π*x[1])*sin(4*π*x[2])
+source(x) = 40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
 p_bdry(x) = 0
-p_sol(x) = 2*sin(2*π*x[1])*sin(4*π*x[2])
-u_sol(x) = -[4π*cos(2π*x[1])*sin(4π*x[2]), 8π*cos(4π*x[2])*sin(2π*x[1])]
+p_sol(x) = 2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
 
 # p_true = [p_sol(x) for x in eachrow(mesh.cell_centroids)]
 # u_true = vcat([u_sol(x) for x in eachrow(mesh.cell_faces)]...)
 
-A,b,ξ = Mixed.Darcy_setup(mesh,k,source,p_bdry,μ)
+A, b, ξ = Mixed.Darcy_setup(mesh, k, source, p_bdry, μ)
 u = ξ[1:Meshing.get_num_faces(mesh)]
-p = ξ[Meshing.get_num_faces(mesh) + 1 : end]
+p = ξ[Meshing.get_num_faces(mesh)+1:end]
 
 # print(norm(p - p_true))
-println(Mixed.norm_L2(mesh,k,p,p_sol))
-println(Mixed.norm_L2(mesh,k,u,u_sol))
+println(Mixed.norm_L2(mesh, k, p, p_sol))
+println(Mixed.norm_L2(mesh, k, u, u_sol))
 
 ##-------------- Interpolate using Dierckx.jl, then plot --------------#
 # using Dierckx

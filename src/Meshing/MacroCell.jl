@@ -6,29 +6,29 @@ import ..Meshing
 struct MacroCells
     ref_size::Float64
 
-    chain_pos::SparseVector{Int, Int} # put in cell, get bk pos
-    faces_2_rm::SparseVector{Bool, Int} # which faces need to be removed?
+    chain_pos::SparseVector{Int,Int} # put in cell, get bk pos
+    faces_2_rm::SparseVector{Bool,Int} # which faces need to be removed?
 end
 
 #-------------- Macro element code --------------#
-function init_macro(mesh::Meshing.Mesh,C::Float64,itf_faces)
-    ref_size = C*maximum(mesh.cell_areas)
+function init_macro(mesh::Meshing.Mesh, C::Float64, itf_faces)
+    ref_size = C * maximum(mesh.cell_areas)
 
     cut_cells = (itf_faces' * mesh.cell_faces)'
 
-    small_cells = find_small_cells(mesh,cut_cells,ref_size)
+    small_cells = find_small_cells(mesh, cut_cells, ref_size)
 
     if !any(small_cells)
         chain_pos = spzeros(Meshing.get_num_cells(mesh))
         faces_2_rm = spzeros(Bool, Meshing.get_num_faces(mesh))
     else
-        chain_pos, faces_2_rm = build_chain(mesh,itf_faces,small_cells)
+        chain_pos, faces_2_rm = build_chain(mesh, itf_faces, small_cells)
     end
 
-    return MacroCells(ref_size,chain_pos, faces_2_rm)
+    return MacroCells(ref_size, chain_pos, faces_2_rm)
 end
 
-function find_small_cells(mesh,cut_cells,ref_size)
+function find_small_cells(mesh, cut_cells, ref_size)
     small_cells = spzeros(Bool, Meshing.get_num_cells(mesh))
 
     for cell in cut_cells.nzind
@@ -38,7 +38,7 @@ function find_small_cells(mesh,cut_cells,ref_size)
     return small_cells
 end
 
-function build_chain(mesh::Meshing.Mesh,itf_faces,small_cells)
+function build_chain(mesh::Meshing.Mesh, itf_faces, small_cells)
     # while loop, each run increases chain_pos
     # for each cell
     tmp_small_cells = copy(small_cells)
@@ -49,7 +49,7 @@ function build_chain(mesh::Meshing.Mesh,itf_faces,small_cells)
     while any(tmp_small_cells)
         for cell in tmp_small_cells.nzind
 
-            faces = Meshing.get_rowvals(mesh.cell_faces,cell)
+            faces = Meshing.get_rowvals(mesh.cell_faces, cell)
             face_inds, ngbr_cells = findnz(mesh.cell_faces[faces, :])[1:2]
             ngbr_faces = faces[face_inds]
 
@@ -81,7 +81,7 @@ end
 function remesh(mesh::Meshing.Mesh, macro_cells::MacroCells)
 
     cell_faces, keep_cells = create_new_cell_faces(mesh, macro_cells)
-    new_cell_faces = cell_faces[:, Meshing.get_num_cells(mesh) + 1 : end]
+    new_cell_faces = cell_faces[:, Meshing.get_num_cells(mesh)+1:end]
 
     new_cell_nodes = Meshing.compute_cell_nodes(new_cell_faces, mesh.face_nodes)
 
