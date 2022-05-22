@@ -79,11 +79,11 @@ function assemble_lhs(mesh, k, μ_inv)
     @assert(k==0, "Only implemented k=0")
 
     A = assemble_mass_matrix(mesh, k, μ_inv)
-    B = mesh.cell_faces
+    B = mesh.cell_faces'
 
     zero_mat = zeros(size(B,2),size(B,2))
 
-    return [A -B; B' zero_mat]
+    return [A -B'; B zero_mat]
 end
 
 function assemble_rhs(mesh, k, source, p_naturalBC)

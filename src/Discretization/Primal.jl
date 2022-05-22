@@ -3,9 +3,9 @@ module Primal
 using SparseArrays
 using LinearAlgebra
 
-import ..NumIntegrate
 import ..Monomials
 import ..Meshing
+import ..NumIntegrate
 
 function Darcy_setup(mesh,source::Function,p_bdry::Function,μ::Function,k::Int)
     A = assemble_stiffness_matrix(mesh, k, μ)

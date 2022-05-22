@@ -10,6 +10,8 @@ center = [0.5, 0.5]
 
 levelset(x) = LinearAlgebra.norm(x - center) - radius
 
+levelset(x) = x[2]-(0.5+1e-7)
+
 ##-------------- Problem setup --------------#
 
 k = 1 # Polynomial degree
@@ -28,7 +30,7 @@ h = [];
 errors = [];
 cond_nbrs = [];
 
-for N = 2 .^ (1:7) # size of mesh
+for N = [5+i for i = 1:20]#2 .^ (1:7) # size of mesh
     append!(h, 1 / N)
     mesh = Meshing.create_tri_mesh(N)
     # mesh = Meshing.create_rect_mesh(N)
@@ -43,7 +45,7 @@ for N = 2 .^ (1:7) # size of mesh
 
     areas = mesh.cell_areas
     area_ratio = minimum(areas) / maximum(areas)
-    # append!(cond_nbrs,cond(Array(A_0)))
+    append!(cond_nbrs,cond(Array(A_0)))
     println("Mesh size ", N, " done.")
 end
 convgs = log.(errors[2:end] ./ errors[1:end-1]) ./ log.(h[2:end] ./ h[1:end-1])#log(evec[i]/evec[i-1])/log(h[i]/h[i-1])

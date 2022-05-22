@@ -26,7 +26,7 @@ Meshing.draw_mesh(mesh)
 ##-------------- Testing ground --------------#
 
 k = 0 # Polynomial degree
-μ(x) = 1
+μ(x) = [1 0; 0 1]
 
 # source(x) = 0
 # p_bdry(x) = 1 - x[1]
@@ -38,9 +38,6 @@ p_bdry(x) = 0
 p_sol(x) = 2*sin(2*π*x[1])*sin(4*π*x[2])
 u_sol(x) = -[4π*cos(2π*x[1])*sin(4π*x[2]), 8π*cos(4π*x[2])*sin(2π*x[1])]
 
-# p_true = [p_sol(x) for x in eachrow(mesh.cell_centroids)]
-# u_true = vcat([u_sol(x) for x in eachrow(mesh.cell_faces)]...)
-
 A,b,ξ = Mixed.Darcy_setup(mesh,k,source,p_bdry,μ)
 u = ξ[1:Meshing.get_num_faces(mesh)]
 p = ξ[Meshing.get_num_faces(mesh) + 1 : end]
@@ -50,31 +47,34 @@ println(Mixed.norm_L2(mesh,k,p,p_sol))
 println(Mixed.norm_L2(mesh,k,u,u_sol))
 
 ##-------------- Interpolate using Dierckx.jl, then plot --------------#
-# using Dierckx
+using Dierckx
 
-# # Pressure
-# xC_list = unique(sort(mesh.cell_centroids[:,1]))
-# yC_list = unique(sort(mesh.cell_centroids[:,2]))
+p_true = [p_sol(x) for x in eachrow(mesh.cell_centroids)]
+# u_true = vcat([u_sol(x) for x in eachrow(mesh.cell_faces)]...)
 
-# ph_spl = Dierckx.Spline2D(mesh.cell_centroids[:,1],mesh.cell_centroids[:,2],p,s=100) # s is "smoothing factor", needs >0.0 default to work
-# Zph = evalgrid(ph_spl,xC_list,yC_list)
+# Pressure
+xC_list = unique(sort(mesh.cell_centroids[:,1]))
+yC_list = unique(sort(mesh.cell_centroids[:,2]))
 
-# heatmap(xC_list, yC_list, Zph',
-#     #    c=cgrad([:blue,:white,:red]),
-#         xlabel="x", ylabel="y", xlims = (0,1), ylims=(0,1),
-#         title="VEM p", aspect_ratio = :equal)
+ph_spl = Dierckx.Spline2D(mesh.cell_centroids[:,1],mesh.cell_centroids[:,2],p,s=100) # s is "smoothing factor", needs >0.0 default to work
+Zph = evalgrid(ph_spl,xC_list,yC_list)
 
-# p_spl = Dierckx.Spline2D(mesh.cell_centroids[:,1],mesh.cell_centroids[:,2],p_true,s=1)
-# Zp = evalgrid(p_spl,xC_list,yC_list)
-# hms = [heatmap(xC_list, yC_list, Zph',
-# #        c=cgrad([:blue,:white,:red]),
-#         xlabel="x", ylabel="y", xlims = (0,1), ylims=(0,1),
-#         title="VEM solution", aspect_ratio = :equal),
-#        heatmap(xC_list, yC_list, Zp',
-# #        c=cgrad([:blue,:white,:red]),
-#         xlabel="x", ylabel="y", xlims = (0,1), ylims=(0,1),
-#         title="True solution", aspect_ratio = :equal)]
-# plt = plot(hms..., layout = (1,2), colorbar = true)
+heatmap(xC_list, yC_list, Zph',
+    #    c=cgrad([:blue,:white,:red]),
+        xlabel="x", ylabel="y", xlims = (0,1), ylims=(0,1),
+        title="VEM p", aspect_ratio = :equal)
+
+p_spl = Dierckx.Spline2D(mesh.cell_centroids[:,1],mesh.cell_centroids[:,2],p_true,s=1)
+Zp = evalgrid(p_spl,xC_list,yC_list)
+hms = [heatmap(xC_list, yC_list, Zph',
+#        c=cgrad([:blue,:white,:red]),
+        xlabel="x", ylabel="y", xlims = (0,1), ylims=(0,1),
+        title="VEM solution", aspect_ratio = :equal),
+       heatmap(xC_list, yC_list, Zp',
+#        c=cgrad([:blue,:white,:red]),
+        xlabel="x", ylabel="y", xlims = (0,1), ylims=(0,1),
+        title="True solution", aspect_ratio = :equal)]
+plt = plot(hms..., layout = (1,2), colorbar = true)
 # savefig(plt,"sols.png")
 
 # Velocity
