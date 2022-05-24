@@ -123,31 +123,41 @@ function assemble_rhs(mesh, source, k)
     return sparse(I, J, V)
 end
 
+#-------------- VEM mass matrix k=1 --------------#
+function assemble_mass_matrix(mesh, k, μ=x -> 1)
+
+    I = Int[]
+    J = Int[]
+    V = Float64[]
+
+    for (cell, nodes) in enumerate(mesh.cell_nodes) # Loops over mesh elements
+        Proj, PreProj, _ = element_projection_matrices(mesh, cell, k)
+
+        M_el = element_mass_matrix(Proj, PreProj, mesh.cell_areas[cell])
+
+        append!(I, repeat(nodes, length(nodes)))
+        append!(J, repeat(nodes, inner=length(nodes)))
+        append!(V, vec(M_el))
+    end
+
+    return sparse(I, J, V)
+end
+
+function element_mass_matrix(Proj, PreProj, area)
+    # H = PreProj, L2 proj to monomial basis
+    # Π^0 = Proj, L2 proj to vem basis
+
+    C = PreProj*PreProj # k=1 => n_k-2 = 0 => C = H*H
+    return C' * (H \ C) + area*(I - Proj)' * (I - Proj)
+end
+
+#-------------- VEM post processing --------------#
 function create_restriction(dofs)
     I = 1:sum(dofs)
     J = findall(vec(dofs))
     V = trues(sum(dofs))
 
     return sparse(I, J, V, sum(dofs), length(dofs))
-end
-
-""" Projects the basis functions of an element to L2 """
-function loc_proj_L2(coords) # Obsolete?
-
-    #@assert(k==1, "Only implemented k=1: Π_0 = Π^∇")
-
-    # Π^∇φ_i = 1/2|E|(x-V)*d+1/N^V
-
-    nvx = size(coords, 1) # number of vertices
-    d_vec = circshift(coords, 1) - circshift(coords, -1)
-    d_perp = (1 / 2 * [0 -1; 1 0] * d_vec')' # 3x2 adjoint
-    @assert(size(d_perp, 1) > size(d_perp, 2))
-
-    centroid = [sum(coords[:, i]) / nvx for i in 1:2]
-    area = get_poly_area(coords)
-
-    proj_collection(x, idx) = 1 / (2 * area) * dot(x - centroid, d_perp[idx, :]) + 1 / nvx
-    return proj_collection
 end
 
 
