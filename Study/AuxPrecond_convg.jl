@@ -5,7 +5,7 @@ using Revise
 using VirtuE
 
 ##-------------- Level set stuff --------------#
-levelset(x) = x[2]-(0.5+1e-7)
+levelset(x) = x[2] - (0.5 + 1e-7)
 
 ##-------------- Problem setup --------------#
 
@@ -15,8 +15,8 @@ N = 10 # size of mesh
 mesh = Meshing.create_tri_mesh(N)
 mesh = Meshing.remesh(mesh, levelset)
 
-A=AuxPrecond.assemble_vector_primal_stiffness_matrix(mesh,k,1)
-# M=AuxPrecond.assemble_vector_primal_mass_matrix(mesh,k)
+A = AuxPrecond.assemble_vector_primal_stiffness_matrix(mesh, k, x -> 1)
+# M = AuxPrecond.assemble_vector_primal_mass_matrix(mesh, k)
 # ##-------------- Refinement tests, in a for loop --------------#
 
 # h = [];
