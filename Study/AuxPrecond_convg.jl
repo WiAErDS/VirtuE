@@ -15,8 +15,17 @@ N = 10 # size of mesh
 mesh = Meshing.create_tri_mesh(N)
 mesh = Meshing.remesh(mesh, levelset)
 
-A = AuxPrecond.assemble_vector_primal_stiffness_matrix(mesh, k, x -> 1)
-# M = AuxPrecond.assemble_vector_primal_mass_matrix(mesh, k)
+A_vec = AuxPrecond.assemble_vector_primal_stiffness_matrix(mesh, k, x -> 1)
+A = Primal.assemble_stiffness_matrix(mesh, k, x -> 1)
+M = AuxPrecond.assemble_vector_primal_mass_matrix(mesh, k)
+S_vec = AuxPrecond.assemble_vector_smoother(mesh, k, x -> 1)
+S = AuxPrecond.assemble_smoother(mesh, k, x -> 1)
+Π = AuxPrecond.assemble_div_projector_matrix(mesh)
+
+p = [mesh.face_nodes
+    mesh.face_nodes]
+
+Π * p
 # ##-------------- Refinement tests, in a for loop --------------#
 
 # h = [];
