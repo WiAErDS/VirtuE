@@ -50,6 +50,7 @@ function element_mass_matrix(Proj, PreProj, G)
 end
 
 function assemble_mass_matrix(mesh, k, μ_inv)
+    @assert(k == 0, "Only implemented k=0")
 
     I = Int[]
     J = Int[]

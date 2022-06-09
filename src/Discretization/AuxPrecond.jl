@@ -4,6 +4,7 @@ using SparseArrays
 using LinearAlgebra
 
 import ..Primal
+import ..Mixed
 # import ..Monomials
 import ..Meshing
 # import ..NumIntegrate
@@ -28,16 +29,23 @@ function assemble_vector_smoother(mesh, k, μ_inv)
     return spdiagm(1 ./ diag_vec)
 end
 
-function assemble_smoother(mesh, k, μ_inv)
-    A = Primal.assemble_stiffness_matrix(mesh, k, μ_inv)
-    M = Primal.assemble_mass_matrix(mesh, k)
+function assemble_div_smoother(mesh, k, μ_inv)
+    M = Mixed.assemble_mass_matrix(mesh, k, μ_inv)
+
+    A = spzeros(size(M))
+    for cell = 1:Meshing.get_num_cells(mesh)
+        area = mesh.cell_areas[cell]
+        faces = Meshing.get_rowvals(mesh.cell_faces, cell)
+        num_faces = length(faces)
+        A[faces, faces] += 1 / area * ones(num_faces, num_faces)
+    end
 
     diag_vec = diag(M + A)
     return spdiagm(1 ./ diag_vec)
 end
 
 function curl(mesh)
-    return mesh.face_nodes'
+    return [mesh.face_nodes' mesh.face_nodes']
 end
 
 function assemble_div_projector_matrix(mesh)
@@ -55,6 +63,25 @@ function assemble_div_projector_matrix(mesh)
         end
     end
     return Π
+end
+
+function apply_aux_precond(ξ, mesh, k, μ_inv=x -> 1)
+    A_vec = assemble_vector_primal_stiffness_matrix(mesh, k, μ_inv)
+    A = Primal.assemble_stiffness_matrix(mesh, k, μ_inv)
+    # M = AuxPrecond.assemble_vector_primal_mass_matrix(mesh, k)
+    S_vec = assemble_vector_smoother(mesh, k, μ_inv)
+    S = assemble_div_smoother(mesh, k - 1, μ_inv)
+    C = curl(mesh)
+    Π = assemble_div_projector_matrix(mesh)
+
+
+    out = C * S_vec * C' * ξ
+    out += S * ξ
+    # + CA_invC'ξ
+    out += C * (A_vec \ (C' * ξ))
+    # + Pi A_inv Pi^T 
+    out += Π * (A_vec \ (Π' * ξ))
+    return out
 end
 
 end
