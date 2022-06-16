@@ -34,7 +34,7 @@ function element_projection_matrices(mesh, cell, k)
 
     D = normals * grads
 
-    C = [Monomials.eval_scaled_mon(fc[j, :], centroid, h, monExps[i, :]) * orient_val[j] for i in 1:size(monExps, 1), j in 1:size(orient_val, 1)]
+    C = [Monomials.eval_scaled_mon(fc[j, :], centroid, h, α) * orient_val[j] for α in eachrow(monExps), j in 1:size(orient_val, 1)]
 
     G = C * D
 

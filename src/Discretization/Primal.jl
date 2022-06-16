@@ -45,12 +45,13 @@ function element_projection_matrices(mesh, cell, k=1)
     h = mesh.cell_diams[cell]
     centroid = mesh.cell_centroids[cell, :]
 
-    D = [Monomials.eval_scaled_mon(coord, centroid, h, exps) for coord in eachrow(coords), exps in eachrow(monExps)]
+    D = [Monomials.scaled_mon(mesh, cell, α)(coord) for coord in eachrow(coords), α in eachrow(monExps)]
 
-    gradMon = [Monomials.grad_mon(centroid, centroid, h, exps)' for exps in eachrow(monExps[2:end, :])] #create grads
+    gradMon = [Monomials.grad_mon(centroid, centroid, h, exps)' for exps in eachrow(monExps)] #create grads
     gradMon = vcat(gradMon...) # reshape to 2D array
 
-    B = [ones(1, nvx) / nvx; gradMon * d_perp]
+    B = gradMon * d_perp
+    B[1, :] .= 1 / nvx
 
     G = B * D
 

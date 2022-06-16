@@ -9,15 +9,14 @@ import ..Meshing
 - h is the diameter of the space
 - α is the multiindex exponent
 """
-function eval_scaled_mon(p, p_c, h, α)
-    m = 1
-    for i in 1:length(α)
-        m *= ((p[i] - p_c[i]) / h)^α[i]
-    end
-    return m
+function eval_scaled_mon(x, p_c, h, α)
+    m = ((x - p_c) / h) .^ α
+    return prod(m)
 end
 
-function scaled_mon(p_c, h, α)
+function scaled_mon(grid::Meshing.Mesh, cell::Int, α)
+    p_c = grid.cell_centroids[cell, :]
+    h = grid.cell_diams[cell]
     return x -> eval_scaled_mon(x, p_c, h, α)
 end
 
@@ -27,14 +26,14 @@ end
 - h is the diameter of the space
 - α is the multiindex exponent OF THE MONOM TO DIFFERENTIATE
 """
-function grad_mon(p, p_c, h, α)
+function grad_mon(x, p_c, h, α)
     # m1 = α[1]/h*ScaledMon(p,p_c,h,[α[1]-1 α[2]])
     # m2 = α[2]/h*ScaledMon(p,p_c,h,[α[1] α[2]-1])
     m_1 = zeros(length(α))
     for i in 1:length(α)
         α_1 = copy(α)
         α_1[i] = max(α_1[i] - 1, 0) # reduce exponent of deriv by 1
-        m_1[i] = α[i] / h * eval_scaled_mon(p, p_c, h, α_1)
+        m_1[i] = α[i] / h * eval_scaled_mon(x, p_c, h, α_1)
     end
     return m_1
 end
