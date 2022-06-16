@@ -2,7 +2,7 @@ using LinearAlgebra
 using SparseArrays
 
 using Revise
-using VirtuE
+using VirtuE # [Note for future: make sure every module has last line = end, otherwise really nasty error which are hard to trace]
 
 ##-------------- Level set stuff --------------#
 levelset(x) = x[2] - (0.5 + 1e-7)
@@ -19,13 +19,20 @@ A_vec = AuxPrecond.assemble_vector_primal_stiffness_matrix(mesh, k, x -> 1)
 A = Primal.assemble_stiffness_matrix(mesh, k, x -> 1)
 M = AuxPrecond.assemble_vector_primal_mass_matrix(mesh, k)
 S_vec = AuxPrecond.assemble_vector_smoother(mesh, k, x -> 1)
-S = AuxPrecond.assemble_smoother(mesh, k, x -> 1)
+S = AuxPrecond.assemble_div_smoother(mesh, k - 1, x -> 1)
+C = AuxPrecond.curl(mesh)
 Π = AuxPrecond.assemble_div_projector_matrix(mesh)
 
-p = [mesh.face_nodes
-    mesh.face_nodes]
+num_faces = Meshing.get_num_faces(mesh)
+p = zeros(num_faces)
 
-Π * p
+AuxPrecond.apply_aux_precond(p, mesh, 1)
+
+# p = [mesh.face_nodes
+#     mesh.face_nodes]
+
+# Π * p
+
 # ##-------------- Refinement tests, in a for loop --------------#
 
 # h = [];
