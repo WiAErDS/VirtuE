@@ -82,7 +82,7 @@ function assemble_lhs(mesh, k, μ_inv=x -> 1)
     A = assemble_mass_matrix(mesh, k, μ_inv)
     B = mesh.cell_faces'
 
-    zero_mat = zeros(size(B, 2), size(B, 2))
+    zero_mat = zeros(size(B, 1), size(B, 1))
 
     return [A -B'; B zero_mat]
 end
