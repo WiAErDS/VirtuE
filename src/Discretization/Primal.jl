@@ -147,8 +147,8 @@ function element_mass_matrix(Proj, PreProj, area)
     # H = PreProj, L2 proj to monomial basis
     # Π^0 = Proj, L2 proj to vem basis
 
-    C = PreProj*PreProj # k=1 => n_k-2 = 0 => C = H*H
-    return C' * (PreProj \ C) + area*(I - Proj)' * (I - Proj)
+    C = PreProj * PreProj # k=1 => n_k-2 = 0 => C = H*H
+    return C' * (PreProj \ C) + area * (I - Proj)' * (I - Proj)
 end
 
 #-------------- VEM post processing --------------#
