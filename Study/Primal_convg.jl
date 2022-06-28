@@ -25,8 +25,7 @@ u_sol(x) = 2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
 h = [];
 errors = [];
 
-# for x2 = 
-for N = 2 .^ (1:7) # size of mesh
+for N = 2 .^ (2:7) # size of mesh
     append!(h, 1 / N)
     mesh = Meshing.create_tri_mesh(N)
     # mesh = Meshing.create_rect_mesh(N)
