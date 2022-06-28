@@ -9,13 +9,13 @@ import ..Meshing
 
 function assemble_vector_primal_stiffness_matrix(mesh, k, μ_inv)
     A = Primal.assemble_stiffness_matrix(mesh, k, μ_inv)
-    zero_mat = zeros(size(A, 1), size(A, 2))
+    zero_mat = spzeros(size(A))
     return [A zero_mat; zero_mat A]
 end
 
 function assemble_vector_primal_mass_matrix(mesh, k)
     M = Primal.assemble_mass_matrix(mesh, k)
-    zero_mat = zeros(size(M, 1), size(M, 2))
+    zero_mat = spzeros(size(M))
     return [M zero_mat; zero_mat M]
 end
 
@@ -77,13 +77,11 @@ function apply_aux_precond(ξ, mesh, k, μ_inv=x -> 1)
     C = curl(mesh) # faces -> nodes
     Π = assemble_div_projector_matrix(mesh) # faces -> nodes
 
-
     out = C * S_vec * C' * ξ
     out += S * ξ
-    # + CA_invC'ξ
-    out += C * (AA_vec \ (C' * ξ))
-    # + Pi A_inv Pi^T 
-    out += Π * (AA_vec \ (Π' * ξ))
+    # collect: sparse -> dense, rhs b apparently needs to be dense for A \ b
+    out += C * (AA_vec \ collect(C' * ξ))    # + CA_invC'ξ
+    out += Π * (AA_vec \ collect(Π' * ξ))    # + Pi A_inv Pi^T 
     return out
 end
 

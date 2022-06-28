@@ -32,12 +32,17 @@ M = Mixed.assemble_mass_matrix(mesh, k - 1)
 M_prec = spzeros(size(M))
 colcount = 1
 for m in eachcol(M)
-    println(C' * m)
+    # println(C' * m)
     m_prec = AuxPrecond.apply_aux_precond(m, mesh, k)
     M_prec[colcount, :] = m_prec
     colcount += 1
 end
 
+minimum(abs.(eigvals(collect(M))))
+maximum(abs.(eigvals(collect(M))))
+
+minimum(abs.(eigvals(collect(M_prec))))
+maximum(abs.(eigvals(collect(M_prec))))
 
 # ##-------------- Refinement tests, in a for loop --------------#
 
