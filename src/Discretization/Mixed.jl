@@ -49,7 +49,7 @@ function element_mass_matrix(Proj, PreProj, G)
     return PreProj' * G * PreProj + (I - Proj)' * (I - Proj)
 end
 
-function assemble_mass_matrix(mesh, k, μ_inv)
+function assemble_mass_matrix(mesh, k, μ_inv=x -> 1)
     @assert(k == 0, "Only implemented k=0")
 
     I = Int[]

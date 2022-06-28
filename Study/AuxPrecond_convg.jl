@@ -15,23 +15,29 @@ N = 10 # size of mesh
 mesh = Meshing.create_tri_mesh(N)
 mesh = Meshing.remesh(mesh, levelset)
 
-A_vec = AuxPrecond.assemble_vector_primal_stiffness_matrix(mesh, k, x -> 1)
-A = Primal.assemble_stiffness_matrix(mesh, k, x -> 1)
-M = AuxPrecond.assemble_vector_primal_mass_matrix(mesh, k)
-S_vec = AuxPrecond.assemble_vector_smoother(mesh, k, x -> 1)
-S = AuxPrecond.assemble_div_smoother(mesh, k - 1, x -> 1)
-C = AuxPrecond.curl(mesh)
-Π = AuxPrecond.assemble_div_projector_matrix(mesh)
-
 num_faces = Meshing.get_num_faces(mesh)
-p = zeros(num_faces)
 
-AuxPrecond.apply_aux_precond(p, mesh, 1)
+v = zeros(num_faces)
+AuxPrecond.apply_aux_precond(p, mesh, k)
 
-# p = [mesh.face_nodes
-#     mesh.face_nodes]
+# M v = λ inv(P) v  <-> M v = inv(P) λ v <-> P M v = λ v
 
-# Π * p
+# A_vec = AuxPrecond.assemble_vector_primal_stiffness_matrix(mesh, k, x -> 1)
+# S_vec = AuxPrecond.assemble_vector_smoother(mesh, k, x -> 1)
+# S = AuxPrecond.assemble_div_smoother(mesh, k - 1, x -> 1)
+# C = AuxPrecond.curl(mesh)
+# Π = AuxPrecond.assemble_div_projector_matrix(mesh)
+
+M = Mixed.assemble_mass_matrix(mesh, k - 1)
+M_prec = spzeros(size(M))
+colcount = 1
+for m in eachcol(M)
+    println(C' * m)
+    m_prec = AuxPrecond.apply_aux_precond(m, mesh, k)
+    M_prec[colcount, :] = m_prec
+    colcount += 1
+end
+
 
 # ##-------------- Refinement tests, in a for loop --------------#
 
