@@ -138,22 +138,15 @@ end
 
 #-------------- VEM mass matrix k=1 --------------#
 function assemble_mass_matrix(mesh, k, μ_inv=x -> 1)
-
     @assert(k == 0 || k == 1, "Only implemented k=0,1")
 
-    I = Int[]
-    J = Int[]
-    V = Float64[]
+    M = spdiagm(mesh.cell_areas)
 
-    if k == 0
-        for (cell, _) in enumerate(mesh.cell_nodes) # Loops over mesh elements
-            M_el = mesh.cell_areas[cell]
+    if k > 0
+        I = Int[]
+        J = Int[]
+        V = Float64[]
 
-            append!(I, cell)
-            append!(J, cell)
-            append!(V, M_el)
-        end
-    elseif k == 1
         for (cell, nodes) in enumerate(mesh.cell_nodes) # Loops over mesh elements
             Proj, PreProj, H = element_projection_matrices(mesh, cell, k, true)
 
@@ -163,9 +156,10 @@ function assemble_mass_matrix(mesh, k, μ_inv=x -> 1)
             append!(J, repeat(nodes, inner=length(nodes)))
             append!(V, vec(M_el))
         end
+        M = sparse(I, J, V)
     end
 
-    return sparse(I, J, V)
+    return M
 end
 
 function element_mass_matrix(Proj, PreProj, H, area)

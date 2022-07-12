@@ -6,6 +6,7 @@ using LinearAlgebra
 import ..Monomials
 import ..Meshing
 import ..NumIntegrate
+import ..Primal # needed only for assemble_divdiv_matrix
 
 #-------------- Mixed VEM k=0 --------------#
 function Darcy_setup(mesh, k, source::Function, p_naturalBC::Function, μ_inv::Function=x -> 1, amPreconditioning=false)
@@ -78,6 +79,15 @@ function assemble_mass_matrix(mesh, k, μ_inv=x -> 1)
     end
 
     return sparse(I, J, V)
+end
+
+function assemble_divdiv_matrix(mesh, k, μ_inv=x -> 1)
+    @assert(k == 0, "Only implemented k=0")
+
+    B = mesh.cell_faces'
+    M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
+
+    return B' * (M_0 \ B)
 end
 
 function assemble_lhs(mesh, k, μ_inv=x -> 1)

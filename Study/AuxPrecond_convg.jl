@@ -41,12 +41,12 @@ for j = 3:7
     M = AuxPrecond.assemble_mixed_energy_matrix(mesh, k, x -> 1)
     M_prec = AuxPrecond.apply_aux_precond(M, mesh, k)
 
-    # eigs = (eigvals(collect(M)))
-    # append!(cond_nbrs, maximum(eigs) / minimum(eigs))
-    # eigs_prec = (eigvals(collect(M_prec)))
-    # append!(cond_nbrs_prec, maximum(eigs_prec) / minimum(eigs_prec))
-    append!(cond_nbrs, cond(Array(M)))
-    append!(cond_nbrs_prec, cond(Array(M_prec)))
+    eigs = eigvals(collect(M))
+    append!(cond_nbrs, maximum(eigs) / minimum(eigs))
+    eigs_prec = eigvals(collect(M_prec))
+    append!(cond_nbrs_prec, maximum(eigs_prec) / minimum(eigs_prec))
+    # append!(cond_nbrs, cond(Array(M)))
+    # append!(cond_nbrs_prec, cond(Array(M_prec)))
 
     # areas = mesh.cell_areas
     # area_ratio = minimum(areas) / maximum(areas)

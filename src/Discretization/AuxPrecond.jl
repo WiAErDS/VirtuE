@@ -27,18 +27,7 @@ function assemble_primal_energy_matrix(mesh, k, μ_inv)
 end
 function assemble_mixed_energy_matrix(mesh, k, μ_inv)
     M = Mixed.assemble_mass_matrix(mesh, k, μ_inv)
-
-    # A_div = spzeros(size(M))
-    # for cell = 1:Meshing.get_num_cells(mesh)
-    #     area = mesh.cell_areas[cell]
-    #     faces = Meshing.get_rowvals(mesh.cell_faces, cell)
-    #     num_faces = length(faces)
-    #     A_div[faces, faces] += 1 / area * ones(num_faces, num_faces)
-    # end
-
-    B = mesh.cell_faces'
-    M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
-    A_div = B' * (M_0 \ B)
+    A_div = Mixed.assemble_divdiv_matrix(mesh, k, μ_inv)
     return A_div + M
 end
 function assemble_vector_primal_energy_matrix(mesh, k, μ_inv)
@@ -103,11 +92,9 @@ function apply_aux_precond(Mat, mesh, k=0, μ_inv=x -> 1) # not sure how to do t
     S = create_smoother(E)
 
     Mat_prec = spzeros(size(Mat))
-    # colcount = 1
     for (colcount, col) in enumerate(eachcol(Mat))
         col_prec = apply_aux_precond_vec(col, S_div, Π, E_vec, C, S, E)
         Mat_prec[:, colcount] = col_prec
-        # colcount += 1
     end
     return Mat_prec
 end
