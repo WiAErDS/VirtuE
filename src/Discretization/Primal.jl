@@ -31,7 +31,7 @@ function Darcy_setup(mesh, source::Function, p_bdry::Function, μ::Function, k::
 end
 
 #-------------- VEM k=1 --------------#
-function element_projection_matrices(mesh, cell, k=1)
+function element_projection_matrices(mesh, cell, k=1, assembling_mass_matrix=false)
 
     @assert(k == 1, "Only implemented k=1")
     monExps = Monomials.mon_exp(k)
@@ -57,6 +57,18 @@ function element_projection_matrices(mesh, cell, k=1)
 
     PreProj = G \ B # As a rule: inv(G)*B is superslow.
     Proj = D * PreProj
+
+    if assembling_mass_matrix
+        num_mons = size(monExps, 1)
+        G = zeros(num_mons, num_mons) # G not needed, reset it to be H matrix
+        for i = 1:num_mons
+            for j = 1:num_mons
+                integrand(x) = Monomials.eval_scaled_mon(x, centroid, h, monExps[i, :]) * Monomials.eval_scaled_mon(x, centroid, h, monExps[j, :])
+                G[i, j] = NumIntegrate.quad_integral_el(coords, integrand, 2 * k)
+            end
+        end
+
+    end
 
     return Proj, PreProj, G
 end
@@ -125,31 +137,41 @@ function assemble_rhs(mesh, source, k)
 end
 
 #-------------- VEM mass matrix k=1 --------------#
-function assemble_mass_matrix(mesh, k, μ=x -> 1)
+function assemble_mass_matrix(mesh, k, μ_inv=x -> 1)
+
+    @assert(k == 0 || k == 1, "Only implemented k=0,1")
 
     I = Int[]
     J = Int[]
     V = Float64[]
 
-    for (cell, nodes) in enumerate(mesh.cell_nodes) # Loops over mesh elements
-        Proj, PreProj, _ = element_projection_matrices(mesh, cell, k)
+    if k == 0
+        for (cell, _) in enumerate(mesh.cell_nodes) # Loops over mesh elements
+            M_el = mesh.cell_areas[cell]
 
-        M_el = element_mass_matrix(Proj, PreProj, mesh.cell_areas[cell])
+            append!(I, cell)
+            append!(J, cell)
+            append!(V, M_el)
+        end
+    elseif k == 1
+        for (cell, nodes) in enumerate(mesh.cell_nodes) # Loops over mesh elements
+            Proj, PreProj, H = element_projection_matrices(mesh, cell, k, true)
 
-        append!(I, repeat(nodes, length(nodes)))
-        append!(J, repeat(nodes, inner=length(nodes)))
-        append!(V, vec(M_el))
+            M_el = element_mass_matrix(Proj, PreProj, H, mesh.cell_areas[cell])
+
+            append!(I, repeat(nodes, length(nodes)))
+            append!(J, repeat(nodes, inner=length(nodes)))
+            append!(V, vec(M_el))
+        end
     end
 
     return sparse(I, J, V)
 end
 
-function element_mass_matrix(Proj, PreProj, area)
-    # H = PreProj, L2 proj to monomial basis
+function element_mass_matrix(Proj, PreProj, H, area)
     # Π^0 = Proj, L2 proj to vem basis
 
-    C = PreProj * PreProj # k=1 => n_k-2 = 0 => C = H*H [???? is this correct]
-    return C' * (PreProj \ C) + area * (I - Proj)' * (I - Proj)
+    return PreProj' * H * PreProj + area * (I - Proj)' * (I - Proj)
 end
 
 #-------------- VEM post processing --------------#

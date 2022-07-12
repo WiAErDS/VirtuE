@@ -8,13 +8,17 @@ import ..Meshing
 import ..NumIntegrate
 
 #-------------- Mixed VEM k=0 --------------#
-function Darcy_setup(mesh, k, source::Function, p_naturalBC::Function, μ_inv::Function=x -> 1)
-    A = assemble_lhs(mesh, k, μ_inv)
+function Darcy_setup(mesh, k, source::Function, p_naturalBC::Function, μ_inv::Function=x -> 1, amPreconditioning=false)
+    A, M, B = assemble_lhs(mesh, k, μ_inv)
     b = assemble_rhs(mesh, k, source, p_naturalBC)
 
     ξ = A \ b
 
-    return A, b, ξ
+    if amPreconditioning
+        return A, b, ξ, M, B
+    else
+        return A, b, ξ
+    end
 end
 
 function element_projection_matrices(mesh, cell, k)
@@ -79,12 +83,12 @@ end
 function assemble_lhs(mesh, k, μ_inv=x -> 1)
     @assert(k == 0, "Only implemented k=0")
 
-    A = assemble_mass_matrix(mesh, k, μ_inv)
+    M = assemble_mass_matrix(mesh, k, μ_inv)
     B = mesh.cell_faces'
 
     zero_mat = zeros(size(B, 1), size(B, 1))
 
-    return [A -B'; B zero_mat]
+    return [M -B'; B zero_mat], M, B
 end
 
 function assemble_rhs(mesh, k, source, p_naturalBC)
