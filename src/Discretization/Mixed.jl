@@ -33,7 +33,7 @@ function element_projection_matrices(mesh, cell, k)
 
     # Scaled monomials
     monExps = Monomials.mon_exp(k + 1)[2:end, :]
-    grads = [Monomials.grad_mon(centroid, centroid, h, α) for α in eachrow(monExps)]
+    grads = [Monomials.eval_grad_mon(centroid, centroid, h, α) for α in eachrow(monExps)]
     grads = hcat(grads...)
 
     D = normals * grads

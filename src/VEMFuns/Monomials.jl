@@ -26,16 +26,24 @@ end
 - h is the diameter of the space
 - α is the multiindex exponent OF THE MONOM TO DIFFERENTIATE
 """
-function grad_mon(x, p_c, h, α)
-    # m1 = α[1]/h*ScaledMon(p,p_c,h,[α[1]-1 α[2]])
-    # m2 = α[2]/h*ScaledMon(p,p_c,h,[α[1] α[2]-1])
-    m_1 = zeros(length(α))
-    for i in 1:length(α)
-        α_1 = copy(α)
-        α_1[i] = max(α_1[i] - 1, 0) # reduce exponent of deriv by 1
-        m_1[i] = α[i] / h * eval_scaled_mon(x, p_c, h, α_1)
+function eval_grad_mon(x, p_c, h, α)
+    m_1 = zeros(length(x))
+    for i in 1:length(x)
+        m_1[i] = α[i] / h * eval_scaled_mon(x, p_c, h, reduce_exp(α, i))
     end
     return m_1
+end
+
+function reduce_exp(α, i)
+    α_copy = copy(α)
+    α_copy[i] = max(α[i] - 1, 0) # reduce exponent of deriv by 1
+    return α_copy
+end
+
+function grad_mon(grid::Meshing.Mesh, cell::Int, α)
+    p_c = grid.cell_centroids[cell, :]
+    h = grid.cell_diams[cell]
+    return x -> eval_grad_mon(x, p_c, h, α)
 end
 
 """ Coefficients of Laplace-op on monomial of degree |α|
@@ -99,8 +107,7 @@ function eval_grad_polynomial(x, coef_list, p_c, h, deg)
     αList = αList[2:end, :] # removes the constant monomial
     output = [0.0, 0.0]
     for (α, c) in zip(eachrow(αList), coef_list)
-        # println(α) # (always [1,0] then [0,1])
-        output += c * grad_mon(x, p_c, h, α)
+        output += c * eval_grad_mon(x, p_c, h, α)
     end
     return output
 end
@@ -111,7 +118,7 @@ function scaled_element_stiffness_matrix(mesh, cell, k, μ)
     h = mesh.cell_diams[cell]
     centroid = mesh.cell_centroids[cell, :]
 
-    gradMon = [grad_mon(centroid, centroid, h, exps)' for exps in eachrow(monExps)] #create grads
+    gradMon = [eval_grad_mon(centroid, centroid, h, exps)' for exps in eachrow(monExps)] #create grads
     gradMon = vcat(gradMon...) # reshape to 2D array
 
     return mesh.cell_areas[cell] * gradMon * μ(centroid) * gradMon'

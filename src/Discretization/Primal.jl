@@ -47,7 +47,7 @@ function element_projection_matrices(mesh, cell, k=1, assembling_mass_matrix=fal
 
     D = [Monomials.scaled_mon(mesh, cell, α)(coord) for coord in eachrow(coords), α in eachrow(monExps)]
 
-    gradMon = [Monomials.grad_mon(centroid, centroid, h, exps)' for exps in eachrow(monExps)] #create grads
+    gradMon = [Monomials.eval_grad_mon(centroid, centroid, h, exps)' for exps in eachrow(monExps)] #create grads
     gradMon = vcat(gradMon...) # reshape to 2D array
 
     B = gradMon * d_perp

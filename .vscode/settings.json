@@ -1,0 +1,6 @@
+{
+    "editor.unicodeHighlight.nonBasicASCII": "inUntrustedWorkspace",
+    "editor.unicodeHighlight.allowedCharacters": {
+        "α": true
+    }
+}
