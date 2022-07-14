@@ -16,7 +16,8 @@ mesh = Meshing.remesh(mesh, levelset)
 num_faces = Meshing.get_num_faces(mesh)
 
 M = AuxPrecond.assemble_mixed_energy_matrix(mesh, k, x -> 1)
-M_prec = AuxPrecond.apply_aux_precond(M, mesh, k)
+P = AuxPrecond.AuxPreconditioner(mesh)
+M_prec = AuxPrecond.apply_aux_precond_to_mat(P, collect(M))
 
 eigs = (eigvals(collect(M)))
 maximum(eigs) / minimum(eigs)
@@ -39,7 +40,8 @@ for j = 3:7
     mesh = Meshing.remesh(mesh, levelset)
 
     M = AuxPrecond.assemble_mixed_energy_matrix(mesh, k, x -> 1)
-    M_prec = AuxPrecond.apply_aux_precond(M, mesh, k)
+    P = AuxPrecond.AuxPreconditioner(mesh)
+    M_prec = AuxPrecond.apply_aux_precond_to_mat(P, collect(M))
 
     eigs = eigvals(collect(M))
     append!(cond_nbrs, maximum(eigs) / minimum(eigs))
@@ -52,9 +54,8 @@ for j = 3:7
     # area_ratio = minimum(areas) / maximum(areas)
     # println(area_ratio)
 
-    AuxPrecond.
-    Meshing.draw_mesh(mesh)
-    println("Proximity length ", j, " done.")
+    # Meshing.draw_mesh(mesh)
+    # println("Proximity length ", j, " done.")
 end
 # convgs = log.(errors[2:end] ./ errors[1:end-1]) ./ log.(h[2:end] ./ h[1:end-1])#log(evec[i]/evec[i-1])/log(h[i]/h[i-1])
 display(hcat([eps, cond_nbrs, cond_nbrs_prec]))

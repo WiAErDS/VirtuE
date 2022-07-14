@@ -7,14 +7,44 @@ import ..Primal
 import ..Mixed
 import ..Meshing
 
+struct AuxPreconditioner
+    E_p::SparseMatrixCSC
+    E_div::SparseMatrixCSC
+    Π::SparseMatrixCSC
+    C::SparseMatrixCSC
+end
+
 """
-Creates smoother out of energy or mass matrix
+Constructor
+"""
+function AuxPreconditioner(mesh, k=0, μ_inv=x -> 1)
+    E_p = assemble_primal_energy_matrix(mesh, k + 1, μ_inv)
+    E_div = assemble_mixed_energy_matrix(mesh, k, μ_inv)
+    Π = assemble_div_projector_matrix(mesh)
+    C = curl(mesh)
+
+    return AuxPreconditioner(E_p, E_div, Π, C)
+end
+
+"""
+Apply the auxiliary space preconditioner P to a vector v
+"""
+function apply_aux_precond(P::AuxPreconditioner, v)
+    v_prec = apply_smoother(P.E_div, v)
+    v_prec += P.Π * (vector_version(P.E_p) \ collect(P.Π' * v))    # + Pi A_inv Pi^T ξ
+    v_prec += P.C * apply_smoother(P.E_p, P.C' * v)
+    v_prec += P.C * (P.E_p \ collect(P.C' * v))
+    return v_prec
+end
+
+"""
+Applies smoother out of energy or mass matrix
 - E some square matrix
-returns inverse of diagonal of E
+- v some vector
+returns inverse of diagonal of E times v
 """
-function create_smoother(E)
-    diag_vec = diag(E)
-    return spdiagm(1 ./ diag_vec)
+function apply_smoother(E, v)
+    return v ./ diag(E)
 end
 
 """
@@ -30,24 +60,13 @@ function assemble_mixed_energy_matrix(mesh, k, μ_inv)
     A_div = Mixed.assemble_divdiv_matrix(mesh, k, μ_inv)
     return A_div + M
 end
-function assemble_vector_primal_energy_matrix(mesh, k, μ_inv)
-    A = assemble_vector_primal_stiffness_matrix(mesh, k, μ_inv)
-    M = assemble_vector_primal_mass_matrix(mesh, k)
-    return A + M
-end
+
 
 """
 These functions assemble vector primal stiffness and mass matrices
 """
-function assemble_vector_primal_stiffness_matrix(mesh, k, μ_inv)
-    A = Primal.assemble_stiffness_matrix(mesh, k, μ_inv)
-    zero_mat = spzeros(size(A))
-    return [A zero_mat; zero_mat A]
-end
-function assemble_vector_primal_mass_matrix(mesh, k)
-    M = Primal.assemble_mass_matrix(mesh, k)
-    zero_mat = spzeros(size(M))
-    return [M zero_mat; zero_mat M]
+function vector_version(M)
+    return blockdiag(M, M)
 end
 
 
@@ -64,64 +83,37 @@ Creates the projector Π : vector primal -> mixed with the property that the int
 is unchanged under the projection
 """
 function assemble_div_projector_matrix(mesh)
+    face_normals = Meshing.get_face_normals(mesh)
+    n_x = spdiagm(face_normals[:, 1])
+    n_y = spdiagm(face_normals[:, 2])
+    return [n_x * mesh.face_nodes' n_y * mesh.face_nodes']
+end
+
+"""
+Applies the preconditioner P to dense matrix Mat
+"""
+function apply_aux_precond_to_mat(P::AuxPreconditioner, Mat::Matrix)
+    M_prec = zeros(size(Mat))
+    for (i, col) in enumerate(eachcol(Mat))
+        M_prec[:, i] = apply_aux_precond(P, col)
+    end
+    return M_prec
+end
+
+
+"""
+Apply auxiliary space preconditioner P to a mixed Darcy system
+"""
+function apply_Darcy_precond(P, v, k)
     num_faces = Meshing.get_num_faces(mesh)
-    num_nodes = Meshing.get_num_nodes(mesh)
-
-    Π = spzeros(num_faces, 2 * num_nodes)
-    for face = 1:num_faces
-        face_normal = Meshing.get_face_normals(mesh, face)
-        nodes = Meshing.get_rowvals(mesh.face_nodes, face) # only if node is on the face, its dof is active
-
-        for node in nodes
-            Π[face, node] += 1 / 2 * face_normal[1] #(dot(p_x, face_normal))
-            Π[face, num_nodes+node] += 1 / 2 * face_normal[2] #(dot(p_y, face_normal))
-        end
-    end
-    return Π
-end
-
-"""
-Applies the preconditioner P to Mat such that P Mat v = λ v
-"""
-function apply_aux_precond(Mat, mesh, k=0, μ_inv=x -> 1) # not sure how to do this with I,J,V
-    S_div = create_smoother(assemble_mixed_energy_matrix(mesh, k, μ_inv))
-    Π = assemble_div_projector_matrix(mesh) # vector nodes -> faces
-    E_vec = assemble_vector_primal_energy_matrix(mesh, k + 1, μ_inv)
-    C = curl(mesh) # nodes -> faces
-    E = assemble_primal_energy_matrix(mesh, k + 1, μ_inv)
-    S = create_smoother(E)
-
-    Mat_prec = spzeros(size(Mat))
-    for (colcount, col) in enumerate(eachcol(Mat))
-        col_prec = apply_aux_precond_vec(col, S_div, Π, E_vec, C, S, E)
-        Mat_prec[:, colcount] = col_prec
-    end
-    return Mat_prec
-end
-function apply_aux_precond_vec(ξ, S_div, Π, E_vec, C, S, E)
-    ξ_prec = S_div * ξ
-    # collect: sparse -> dense, rhs b apparently needs to be dense for A \ b
-    ξ_prec += Π * (E_vec \ collect(Π' * ξ))    # + Pi A_inv Pi^T ξ
-    ξ_prec += C * S * C' * ξ
-    return ξ_prec + C * (E \ collect(C' * ξ))    # + C A_inv C' ξ
-end
-
-"""
-"""
-function apply_Darcy_precond(M, B, b, mesh, k=0, μ_inv=x -> 1)
-    # [P 0; 0 Q]*[M -B'; B 0] = [PM -PB'; QB 0]
-    M_prec = apply_aux_precond(M, mesh, k, μ_inv)
-    Bt_prec = apply_aux_precond(B', mesh, k, μ_inv)
-
     M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
-    Q = create_smoother(M_0)
 
-    zero_mat = zeros(size(B, 1), size(B, 1))
+    v_prec = zeros(length(v))
+    v_prec[1:num_faces] = apply_aux_precond(P, v[1:num_faces])
+    v_prec[num_faces+1:end] = M_0 \ v[num_faces+1:end]
 
-    num_faces = Meshing.get_num_faces(mesh)
-    b_P = apply_aux_precond(b[1:num_faces], mesh, k, μ_inv)
-
-    return [M_prec -Bt_prec; Q*B zero_mat], Array([b_P; Q * b[num_faces+1:end]])
+    return v_prec
 end
+
 
 end
