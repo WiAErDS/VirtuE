@@ -45,13 +45,14 @@ for j = 3:7
     append!(cond_nbrs, maximum(eigs) / minimum(eigs))
     eigs_prec = eigvals(collect(M_prec))
     append!(cond_nbrs_prec, maximum(eigs_prec) / minimum(eigs_prec))
-    # append!(cond_nbrs, cond(Array(M)))
-    # append!(cond_nbrs_prec, cond(Array(M_prec)))
+    # append!(cond_nbrs, cond(Array(M), 1))
+    # append!(cond_nbrs_prec, cond(Array(M_prec), 1))
 
     # areas = mesh.cell_areas
     # area_ratio = minimum(areas) / maximum(areas)
     # println(area_ratio)
 
+    AuxPrecond.
     Meshing.draw_mesh(mesh)
     println("Proximity length ", j, " done.")
 end

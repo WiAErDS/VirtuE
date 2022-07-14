@@ -106,6 +106,8 @@ function apply_aux_precond_vec(ξ, S_div, Π, E_vec, C, S, E)
     return ξ_prec + C * (E \ collect(C' * ξ))    # + C A_inv C' ξ
 end
 
+"""
+"""
 function apply_Darcy_precond(M, B, b, mesh, k=0, μ_inv=x -> 1)
     # [P 0; 0 Q]*[M -B'; B 0] = [PM -PB'; QB 0]
     M_prec = apply_aux_precond(M, mesh, k, μ_inv)
