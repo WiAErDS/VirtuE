@@ -9,17 +9,13 @@ import ..NumIntegrate
 import ..Primal # needed only for assemble_divdiv_matrix
 
 #-------------- Mixed VEM k=0 --------------#
-function Darcy_setup(mesh, k, source::Function, p_naturalBC::Function, μ_inv::Function=x -> 1, amPreconditioning=false)
-    A, M, B = assemble_lhs(mesh, k, μ_inv)
+function Darcy_setup(mesh, k, source::Function, p_naturalBC::Function, μ_inv::Function=x -> 1)
+    A = assemble_lhs(mesh, k, μ_inv)
     b = assemble_rhs(mesh, k, source, p_naturalBC)
 
     ξ = A \ b
 
-    if amPreconditioning
-        return A, b, ξ, M, B
-    else
-        return A, b, ξ
-    end
+    return A, b, ξ
 end
 
 function element_projection_matrices(mesh, cell, k)
@@ -98,7 +94,7 @@ function assemble_lhs(mesh, k, μ_inv=x -> 1)
 
     zero_mat = zeros(size(B, 1), size(B, 1))
 
-    return [M -B'; B zero_mat], M, B
+    return [M -B'; B zero_mat]
 end
 
 function assemble_rhs(mesh, k, source, p_naturalBC)

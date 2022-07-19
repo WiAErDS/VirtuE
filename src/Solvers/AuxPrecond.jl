@@ -12,6 +12,7 @@ struct AuxPreconditioner
     E_div::SparseMatrixCSC
     Π::SparseMatrixCSC
     C::SparseMatrixCSC
+    M_0::SparseMatrixCSC
 end
 
 """
@@ -22,15 +23,17 @@ function AuxPreconditioner(mesh, k=0, μ_inv=x -> 1)
     E_div = assemble_mixed_energy_matrix(mesh, k, μ_inv)
     Π = assemble_div_projector_matrix(mesh)
     C = curl(mesh)
+    M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
 
-    return AuxPreconditioner(E_p, E_div, Π, C)
+    return AuxPreconditioner(E_p, E_div, Π, C, M_0)
 end
 
 """
 Apply the auxiliary space preconditioner P to a vector v
 """
 function apply_aux_precond(P::AuxPreconditioner, v)
-    v_prec = apply_smoother(P.E_div, v)
+    v_prec = zeros(size(v))
+    v_prec += apply_smoother(P.E_div, v)
     v_prec += P.Π * (vector_version(P.E_p) \ collect(P.Π' * v))    # + Pi A_inv Pi^T ξ
     v_prec += P.C * apply_smoother(P.E_p, P.C' * v)
     v_prec += P.C * (P.E_p \ collect(P.C' * v))
@@ -48,14 +51,14 @@ function apply_smoother(E, v)
 end
 
 """
-These functions assemble energy matrices for primal, mixed and vector primal cases
+These functions assemble energy matrices for primal and mixed cases
 """
-function assemble_primal_energy_matrix(mesh, k, μ_inv)
+function assemble_primal_energy_matrix(mesh, k, μ_inv=x -> 1)
     A = Primal.assemble_stiffness_matrix(mesh, k, μ_inv)
     M = Primal.assemble_mass_matrix(mesh, k)
     return A + M
 end
-function assemble_mixed_energy_matrix(mesh, k, μ_inv)
+function assemble_mixed_energy_matrix(mesh, k, μ_inv=x -> 1)
     M = Mixed.assemble_mass_matrix(mesh, k, μ_inv)
     A_div = Mixed.assemble_divdiv_matrix(mesh, k, μ_inv)
     return A_div + M
@@ -86,34 +89,38 @@ function assemble_div_projector_matrix(mesh)
     face_normals = Meshing.get_face_normals(mesh)
     n_x = spdiagm(face_normals[:, 1])
     n_y = spdiagm(face_normals[:, 2])
-    return [n_x * mesh.face_nodes' n_y * mesh.face_nodes']
+    f_n = abs.(mesh.face_nodes') / 2
+    return [n_x * f_n n_y * f_n]
 end
 
 """
-Applies the preconditioner P to dense matrix Mat
+Applies the preconditioner P to dense matrix Mat that scales as divdiv
 """
 function apply_aux_precond_to_mat(P::AuxPreconditioner, Mat::Matrix)
-    M_prec = zeros(size(Mat))
-    for (i, col) in enumerate(eachcol(Mat))
-        M_prec[:, i] = apply_aux_precond(P, col)
-    end
-    return M_prec
+    M_prec = (collect(apply_aux_precond(P, col)) for col in eachcol(Mat))
+    return hcat(M_prec...)
 end
 
 
 """
-Apply auxiliary space preconditioner P to a mixed Darcy system
+Apply auxiliary space preconditioner P to a vector in a mixed Darcy system
 """
-function apply_Darcy_precond(P, v, k)
-    num_faces = Meshing.get_num_faces(mesh)
-    M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
+function apply_Darcy_precond(P::AuxPreconditioner, v)
+    num_cells = size(P.M_0)[1]
 
     v_prec = zeros(length(v))
-    v_prec[1:num_faces] = apply_aux_precond(P, v[1:num_faces])
-    v_prec[num_faces+1:end] = M_0 \ v[num_faces+1:end]
+    v_prec[1:end-num_cells] = apply_aux_precond(P, v[1:end-num_cells])
+    v_prec[end-num_cells+1:end] = P.M_0 \ v[end-num_cells+1:end]
 
     return v_prec
 end
 
+"""
+Applies the preconditioner P to a mixed Darcy system
+"""
+function apply_Darcy_precond_to_mat(P::AuxPreconditioner, Mat)
+    M_prec = (collect(apply_Darcy_precond(P, col)) for col in eachcol(Mat))
+    return hcat(M_prec...)
+end
 
 end
