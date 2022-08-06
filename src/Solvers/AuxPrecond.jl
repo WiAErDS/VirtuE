@@ -2,6 +2,7 @@ module AuxPrecond
 
 using SparseArrays
 using LinearAlgebra
+import Base.:\
 
 import ..Primal
 import ..Mixed
@@ -39,6 +40,14 @@ function apply_aux_precond(P::AuxPreconditioner, v)
     v_prec += P.C * (P.E_p \ collect(P.C' * v))
     return v_prec
 end
+
+function (\)(P::AuxPreconditioner, v::AbstractVector)
+    return apply_aux_precond(P, v)
+end
+
+LinearAlgebra.ldiv!(P::AuxPreconditioner, v::AbstractVector) = v .= P \ v
+LinearAlgebra.ldiv!(y, P::AuxPreconditioner, v::AbstractVector) = y .= P \ v
+
 
 """
 Applies smoother out of energy or mass matrix
