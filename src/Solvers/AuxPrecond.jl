@@ -91,7 +91,7 @@ function assemble_div_projector_matrix(mesh)
     n_y = spdiagm(face_normals[:, 2])
     f_n = abs.(mesh.face_nodes') / 2
     return [n_x * f_n n_y * f_n]
-end
+end # dont understand this one!
 
 """
 Applies the preconditioner P to dense matrix Mat that scales as divdiv
@@ -121,6 +121,26 @@ Applies the preconditioner P to a mixed Darcy system
 function apply_Darcy_precond_to_mat(P::AuxPreconditioner, Mat)
     M_prec = (collect(apply_Darcy_precond(P, col)) for col in eachcol(Mat))
     return hcat(M_prec...)
+end
+
+
+
+"""
+"""
+function create_smoother(E)
+    return spdiagm(1 ./ diag(E))
+end
+
+"""
+"""
+function get_mat_for_gmres_darcy(P::AuxPreconditioner)
+    P_tmp = create_smoother(P.E_div)
+    P_tmp += P.Π * (vector_version(P.E_p) \ collect(P.Π'))   # + Pi A_inv Pi^T ξ
+    P_tmp += P.C * create_smoother(P.E_p) * P.C'
+    P_tmp += P.C * (P.E_p \ collect(P.C'))
+    P_inv = inv(collect(P_tmp))
+    Q_inv = inv(collect(P.M_0))
+    return blockdiag(sparse(P_inv), sparse(Q_inv))
 end
 
 end

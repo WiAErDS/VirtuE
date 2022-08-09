@@ -17,7 +17,7 @@ center = [0.5, 0.5] # center = [0, 0]
 
 # <0:inside, >0:outside
 levelset(x) = norm(x - center) - radius
-levelset(x) = x[2] - 0.7501
+# levelset(x) = x[2] - 0.7501
 
 μ_inv(x) = [1 0; 0 1]
 
