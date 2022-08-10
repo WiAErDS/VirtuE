@@ -2,7 +2,7 @@ module AuxPrecond
 
 using SparseArrays
 using LinearAlgebra
-import Base.: \
+import Base.:\
 import ..Primal
 import ..Mixed
 import ..Meshing
@@ -110,18 +110,45 @@ function apply_aux_precond_to_mat(P::AuxPreconditioner, Mat::Matrix)
 end
 
 
+struct AuxPreconditioner_Darcy
+    P::AuxPreconditioner
+    dummy_distinguisher::Integer
+end
+
+"""
+Constructor
+"""
+function AuxPreconditioner_Darcy(mesh, k=0, μ_inv=x -> 1)
+    E_p = assemble_primal_energy_matrix(mesh, k + 1, μ_inv)
+    E_div = assemble_mixed_energy_matrix(mesh, k, μ_inv)
+    Π = assemble_div_projector_matrix(mesh)
+    C = curl(mesh)
+    M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
+
+    P = AuxPreconditioner(E_p, E_div, Π, C, M_0)
+
+    return AuxPreconditioner_Darcy(P, 1)
+end
+
 """
 Apply auxiliary space preconditioner P to a vector in a mixed Darcy system
 """
-function apply_Darcy_precond(P::AuxPreconditioner, v)
-    num_cells = size(P.M_0)[1]
+function apply_Darcy_precond(D::AuxPreconditioner_Darcy, v)
+    num_cells = size(D.P.M_0)[1]
 
     v_prec = zeros(length(v))
-    v_prec[1:end-num_cells] = apply_aux_precond(P, v[1:end-num_cells])
-    v_prec[end-num_cells+1:end] = P.M_0 \ v[end-num_cells+1:end]
+    v_prec[1:end-num_cells] = apply_aux_precond(D.P, v[1:end-num_cells])
+    v_prec[end-num_cells+1:end] = D.P.M_0 \ v[end-num_cells+1:end]
 
     return v_prec
 end
+
+function (\)(P::AuxPreconditioner_Darcy, v::AbstractVector)
+    return apply_Darcy_precond(P, v)
+end
+
+LinearAlgebra.ldiv!(P::AuxPreconditioner_Darcy, v::AbstractVector) = v .= P \ v
+LinearAlgebra.ldiv!(y, P::AuxPreconditioner_Darcy, v::AbstractVector) = y .= P \ v
 
 """
 Applies the preconditioner P to a mixed Darcy system
