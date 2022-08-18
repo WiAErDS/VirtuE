@@ -16,7 +16,7 @@ k = 0 # Polynomial degree
 
 N = 10 # size of mesh
 
-eps = 5 * 10.0^-7
+eps = 5 * 10.0^-4
 
 mesh = Meshing.create_tri_mesh(N)
 

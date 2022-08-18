@@ -2,7 +2,7 @@ module AuxPrecond
 
 using SparseArrays
 using LinearAlgebra
-import Base.:\
+import Base: \
 import ..Primal
 import ..Mixed
 import ..Meshing
@@ -16,7 +16,7 @@ struct AuxPreconditioner
 end
 
 """
-Constructor
+Constructor s
 """
 function AuxPreconditioner(mesh, k=0, μ_inv=x -> 1)
     E_p = assemble_primal_energy_matrix(mesh, k + 1, μ_inv)
@@ -31,22 +31,14 @@ end
 """
 Apply the auxiliary space preconditioner P to a vector v
 """
-function apply_aux_precond(P::AuxPreconditioner, v)
+function (\)(P::AuxPreconditioner, v::AbstractVector)
     v_prec = zeros(size(v))
     v_prec += apply_smoother(P.E_div, v)
     v_prec += P.Π * (vector_version(P.E_p) \ collect(P.Π' * v))    # + Pi A_inv Pi^T ξ
     v_prec += P.C * apply_smoother(P.E_p, P.C' * v)
-    v_prec += P.C * (P.E_p \ collect(P.C' * v))
+    v_prec += P.C * (P.E_p \ collect(P.C' * v)) # P.E_p is not diagonal, this might be expensive
     return v_prec
 end
-
-function (\)(P::AuxPreconditioner, v::AbstractVector)
-    return apply_aux_precond(P, v)
-end
-
-LinearAlgebra.ldiv!(P::AuxPreconditioner, v::AbstractVector) = v .= P \ v
-LinearAlgebra.ldiv!(y, P::AuxPreconditioner, v::AbstractVector) = y .= P \ v
-
 
 """
 Applies smoother out of energy or mass matrix
@@ -99,62 +91,42 @@ function assemble_div_projector_matrix(mesh)
     n_y = spdiagm(face_normals[:, 2])
     f_n = abs.(mesh.face_nodes') / 2
     return [n_x * f_n n_y * f_n]
-end # dont understand this one!
-
-"""
-Applies the preconditioner P to dense matrix Mat that scales as divdiv
-"""
-function apply_aux_precond_to_mat(P::AuxPreconditioner, Mat::Matrix)
-    M_prec = (collect(apply_aux_precond(P, col)) for col in eachcol(Mat))
-    return hcat(M_prec...)
 end
-
 
 struct AuxPreconditioner_Darcy
     P::AuxPreconditioner
-    dummy_distinguisher::Integer
 end
 
 """
 Constructor
 """
-function AuxPreconditioner_Darcy(mesh, k=0, μ_inv=x -> 1)
-    E_p = assemble_primal_energy_matrix(mesh, k + 1, μ_inv)
-    E_div = assemble_mixed_energy_matrix(mesh, k, μ_inv)
-    Π = assemble_div_projector_matrix(mesh)
-    C = curl(mesh)
-    M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
+function AuxPreconditioner_Darcy(mesh::Meshing.Mesh, k=0, μ_inv=x -> 1)
+    P = AuxPreconditioner(mesh, k, μ_inv)
 
-    P = AuxPreconditioner(E_p, E_div, Π, C, M_0)
-
-    return AuxPreconditioner_Darcy(P, 1)
+    return AuxPreconditioner_Darcy(P)
 end
 
 """
 Apply auxiliary space preconditioner P to a vector in a mixed Darcy system
 """
-function apply_Darcy_precond(D::AuxPreconditioner_Darcy, v)
+function (\)(D::AuxPreconditioner_Darcy, v::AbstractVector)
     num_cells = size(D.P.M_0)[1]
 
     v_prec = zeros(length(v))
-    v_prec[1:end-num_cells] = apply_aux_precond(D.P, v[1:end-num_cells])
+    v_prec[1:end-num_cells] = D.P \ v[1:end-num_cells]
     v_prec[end-num_cells+1:end] = D.P.M_0 \ v[end-num_cells+1:end]
 
     return v_prec
 end
 
-function (\)(P::AuxPreconditioner_Darcy, v::AbstractVector)
-    return apply_Darcy_precond(P, v)
-end
-
-LinearAlgebra.ldiv!(P::AuxPreconditioner_Darcy, v::AbstractVector) = v .= P \ v
-LinearAlgebra.ldiv!(y, P::AuxPreconditioner_Darcy, v::AbstractVector) = y .= P \ v
+LinearAlgebra.ldiv!(D::Union{AuxPreconditioner,AuxPreconditioner_Darcy}, v::AbstractVector) = v .= D \ v
+LinearAlgebra.ldiv!(y, D::Union{AuxPreconditioner,AuxPreconditioner_Darcy}, v::AbstractVector) = y .= D \ v
 
 """
-Applies the preconditioner P to a mixed Darcy system
+Applies the preconditioner P to dense matrix Mat that scales as divdiv, or a mixed Darcy system
 """
-function apply_Darcy_precond_to_mat(P::AuxPreconditioner, Mat)
-    M_prec = (collect(apply_Darcy_precond(P, col)) for col in eachcol(Mat))
+function apply_precond_to_mat(P::Union{AuxPreconditioner,AuxPreconditioner_Darcy}, Mat)
+    M_prec = (collect(P \ col) for col in eachcol(Mat))
     return hcat(M_prec...)
 end
 
