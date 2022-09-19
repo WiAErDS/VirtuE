@@ -458,6 +458,62 @@ function remesh_unfitted(mesh::Mesh, levelset::Function)
     return new_mesh
 end
 
+#-------------- New functions from 19/09/22 -----------#
+function get_rows_from_cols(A::SparseMatrixCSC, cols::SparseVector; ignored_row_entries=1)
+    rows = (abs.(A) * cols .!= 0)
+    if ignored_row_entries != 1
+        @assert(typeof(ignored_row_entries) == SparseVector{Bool,Int64})
+        rows[ignored_row_entries] *= 0
+        dropzeros!(rows)
+    end
+    return rows
+end
+
+function get_ngbr_nodes(grid, nodes; in_interior=false, ignored_faces=1)
+    exterior_nodes = sparsevec(get_bdry_dofs(grid)[1])
+    if in_interior
+        nodes[exterior_nodes] *= 0
+        dropzeros!(nodes)
+    end
+
+    if ignored_faces != 1
+        @assert(typeof(ignored_faces) == SparseVector{Bool,Int64})
+
+        conn_faces = get_rows_from_cols(sparse(grid.face_nodes'), nodes; ignored_row_entries=ignored_faces)
+        if in_interior
+            ignored_nodes = (exterior_nodes + nodes .!= 0)
+            return get_rows_from_cols(grid.face_nodes, conn_faces; ignored_row_entries=ignored_nodes)
+        else
+            return get_rows_from_cols(grid.face_nodes, conn_faces; ignored_row_entries=nodes)
+        end
+    else
+        conn_faces = get_rows_from_cols(sparse(grid.face_nodes'), nodes)
+        if in_interior
+            ignored_nodes = (exterior_nodes + nodes .!= 0)
+            return get_rows_from_cols(grid.face_nodes, conn_faces; ignored_row_entries=ignored_nodes)
+        else
+            return get_rows_from_cols(grid.face_nodes, conn_faces; ignored_row_entries=nodes)
+        end
+    end
+end
+
+function expand_cells(grid, conn_nodes)
+    conn_nodes = findnz(conn_nodes)[1]
+    new_avgd_coords = grid.node_coords[conn_nodes, :]
+    j = 1
+    for node in conn_nodes
+        faces_to_node = grid.face_nodes[node, :]
+        ngbr_nodes = (abs.(grid.face_nodes) * faces_to_node .!= 0)
+
+        ngbr_coords = grid.node_coords[ngbr_nodes, :]
+        new_coord = [sum(ngbr_coords[:, 1]), sum(ngbr_coords[:, 2])] / length(ngbr_coords[:, 1])
+        new_avgd_coords[j, :] = new_coord
+        j = j + 1
+    end
+    grid.node_coords[conn_nodes, :] = new_avgd_coords
+    return Mesh(grid.node_coords, grid.cell_faces, grid.face_nodes)
+end
+
 #-------------- Plot mesh using Plots --------------#
 
 function draw_mesh(mesh)
@@ -473,6 +529,15 @@ end
 
 function draw_cells_on_mesh(plt, mesh, cells=1:get_num_cells(mesh), color::String="red")
     faces = findnz(mesh.cell_faces[:, cells])[1]
+    for face in faces
+        vertices = get_rowvals(mesh.face_nodes, face)
+        Plots.plot!(plt, mesh.node_coords[vertices, 1], mesh.node_coords[vertices, 2], linecolor=color)
+    end
+    display(plt)
+    return plt
+end
+
+function draw_faces_on_mesh(plt, mesh, faces, color::String="red")
     for face in faces
         vertices = get_rowvals(mesh.face_nodes, face)
         Plots.plot!(plt, mesh.node_coords[vertices, 1], mesh.node_coords[vertices, 2], linecolor=color)
