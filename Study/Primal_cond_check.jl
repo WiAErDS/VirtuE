@@ -35,7 +35,12 @@ for x2 = 10.0 .^ [-4, -5, -6] # location of interface line
 
     areas = mesh.cell_areas
     area_ratio = minimum(areas) / maximum(areas)
-    println("Worst area ratio before expansion: ", area_ratio)
+    # println("Worst area ratio before expansion: ", area_ratio)
+
+    diams = mesh.cell_diams
+    aspect_ratios = diams .^ 2 ./ areas
+    println("Maximum aspect ratio before expansion: ", maximum(aspect_ratios))
+
     append!(cond_nbrs, cond(Array(A_0)))
 
     # ------------------- Expand cells --------------------------
@@ -55,7 +60,12 @@ for x2 = 10.0 .^ [-4, -5, -6] # location of interface line
 
     areas = mesh.cell_areas
     area_ratio = minimum(areas) / maximum(areas)
-    println("Worst area ratio after expansion: ", area_ratio)
+    # println("Worst area ratio after expansion: ", area_ratio)
+
+    diams = mesh.cell_diams
+    aspect_ratios = diams .^ 2 ./ areas
+    println("Maximum aspect ratio after expansion: ", maximum(aspect_ratios))
+
     append!(cond_nbrs_expanded, cond(Array(A_0)))
 end
 display(cond_nbrs)

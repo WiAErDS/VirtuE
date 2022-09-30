@@ -73,11 +73,11 @@ function element_projection_matrices(mesh, cell, k=1, assembling_mass_matrix=fal
     return Proj, PreProj, G
 end
 
-function element_stiffness_matrix(Proj, PreProj, G)
+function element_stiffness_matrix(Proj, PreProj, G; A=1, d=1)
     Gtilde = copy(G)
     Gtilde[1, :] .= 0
     # TODO: VEM param before (I-Proj)
-    return PreProj' * Gtilde * PreProj + (I - Proj)' * (I - Proj)
+    return PreProj' * Gtilde * PreProj + (d^2 / A)^(-8) * (I - Proj)' * (I - Proj)
 end
 
 function assemble_stiffness_matrix(mesh, k, μ=x -> 1)
@@ -93,7 +93,13 @@ function assemble_stiffness_matrix(mesh, k, μ=x -> 1)
             G = Monomials.scaled_element_stiffness_matrix(mesh, cell, k, μ)
         end
 
-        K_el = element_stiffness_matrix(Proj, PreProj, G)
+        area = mesh.cell_areas[cell]
+        diam = mesh.cell_diams[cell]
+        if diam^2 / area > 4 / π
+            K_el = element_stiffness_matrix(Proj, PreProj, G; A=area, d=diam)
+        else
+            K_el = element_stiffness_matrix(Proj, PreProj, G)
+        end
 
         append!(I, repeat(nodes, length(nodes)))
         append!(J, repeat(nodes, inner=length(nodes)))
