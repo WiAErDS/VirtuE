@@ -55,8 +55,8 @@ returns a list of 2 tuples (coef, [β1,β2]) one for each dimension s.t.
 function Δ_mon_coef(h, α) # note that α[i] or α[i]-1 might be 0
     # create a matrix nbAlpha x dim, of the resulting multiindex exponents of each summand
     # Δ(α,i) = (α[i]-2)<0 ? zeros(length(α)) : [i==j ? (α[j]-2>0)*(α[j]-2) : α[j] for j in 1:length(α)]
-    Δ(α, i) = [i == j ? α[j] - 2 : α[j] for j in 1:length(α)]
-    β = [Δ(α, i) for i in 1:length(α)] # [alpha1,alpha2] of summands along dimension i=1,2
+    Δ(α, i) = [i == j ? α_j - 2 : α_j for (j, α_j) in enumerate(α)]
+    β = [Δ(α, i) for i in eachindex(α)] # [alpha1,alpha2] of summands along dimension i=1,2
 
     nonzero_coef(α_i) = α_i * (α_i - 1) != 0
     return [(α[i] * (α[i] - 1) / h^2, β[i]) for i in 1:length(α) if nonzero_coef(α[i])]
