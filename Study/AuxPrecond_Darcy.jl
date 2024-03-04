@@ -22,8 +22,8 @@ for h = h_list
 
     M = Mixed.assemble_lhs(mesh, k)
     M[num_faces+1:end, :] *= -1 # symmetrize the system
-    P = AuxPrecond.AuxPreconditioner(mesh)
-    M_prec = AuxPrecond.apply_Darcy_precond_to_mat(P, M)
+    P = AuxPrecond.AuxPreconditioner_Darcy(mesh)
+    M_prec = AuxPrecond.apply_precond_to_mat(P, M)
 
     eigs = extrema(abs.(eigvals(collect(M))))
     append!(cond_nbrs, eigs[2] / eigs[1])
@@ -32,3 +32,10 @@ for h = h_list
 end
 
 display(hcat(h_list, cond_nbrs, cond_nbrs_prec)')
+
+levelset(x) = x[2] - (0.5 + 10^(-2))
+mesh = Meshing.create_tri_mesh(10)
+# mesh = Meshing.remesh(mesh, levelset)
+plt = Meshing.draw_mesh(mesh)
+Meshing.draw_line_on_mesh(plt, mesh, levelset)
+# mesh = Meshing.remesh(mesh, levelset)

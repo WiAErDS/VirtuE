@@ -99,6 +99,15 @@ function get_bdry_dofs(grid)
     return bdrynodes, bdryfaces
 end
 
+function get_interior_nodes(grid)
+    # Returns a Boolean array of the boundary nodes and faces
+
+    bdryfaces = sum(abs.(grid.cell_faces), dims=2) .== 1
+    interior_nodes = abs.(grid.face_nodes) * bdryfaces .<= 0 # nodes x 1 bitmatrix, do [:,1] to get vector
+
+    return grid.node_coords[interior_nodes[:,1],:]
+end
+
 function get_tangents(grid, face_id=Colon())
     return grid.face_nodes[:, face_id]' * grid.node_coords
 end
@@ -551,6 +560,22 @@ end
 function draw_curve_on_mesh(plt, mesh, levelset, color::String="blue")
     _, _, cut_coords, _ = mark_intersections(mesh, levelset)
     cut_coords = sortslices(cut_coords, dims=1, by=x -> atan(x[2] - 0.5, x[1] - 0.5)) # sort rows by angle
+
+    for i = 1:size(cut_coords, 1)-1
+        # vertices = get_rowvals(mesh.face_nodes, k)
+        # Plots.plot!(plt, mesh.node_coords[vertices,1], mesh.node_coords[vertices,2], linecolor=color)
+        Plots.plot!(plt, [cut_coords[i, 1], cut_coords[i+1, 1]], [cut_coords[i, 2], cut_coords[i+1, 2]], linecolor=color)
+    end
+    Plots.plot!(plt, [cut_coords[end, 1], cut_coords[1, 1]], [cut_coords[end, 2], cut_coords[1, 2]], linecolor=color)
+    display(plt)
+    return plt
+end
+
+""" Warning: hard coded for straight line levelset
+"""
+function draw_line_on_mesh(plt, mesh, levelset, color::String="red")
+    _, _, cut_coords, _ = mark_intersections(mesh, levelset)
+    # cut_coords = sortslices(cut_coords, dims=1, by=x -> atan(x[2] - 0.5, x[1] - 0.5)) # sort rows by angle
 
     for i = 1:size(cut_coords, 1)-1
         # vertices = get_rowvals(mesh.face_nodes, k)

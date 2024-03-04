@@ -38,13 +38,31 @@ p_bdry(x) = 0
 p_sol(x) = 2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
 u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
 
-A,b,ξ = Mixed.Darcy_setup(mesh,k,source,p_bdry,μ)
+# # No preconditioner
+# A,b,ξ = Mixed.Darcy_setup(mesh,k,source,p_bdry,μ)
+# # Preconditioner
+# A = Mixed.assemble_lhs(mesh, k, μ)
+# b = Mixed.assemble_rhs(mesh, k, source, p_bdry)
+# P = AuxPrecond.AuxPreconditioner_Darcy(mesh)
+# A = AuxPrecond.apply_precond_to_mat(P, A)
+# b = vec(AuxPrecond.apply_precond_to_mat(P, b))
+# ξ = A \ b
+# Preconditioner with gmres
+using IterativeSolvers
+A = Mixed.assemble_lhs(mesh, k, μ)
+b = Mixed.assemble_rhs(mesh, k, source, p_bdry)
+P = AuxPrecond.AuxPreconditioner_Darcy(mesh)
+restart = size(b, 1)
+ξ, _ = gmres(A, b, Pl=P, restart=restart, log=true)
+
+
 u = ξ[1:Meshing.get_num_faces(mesh)]
 p = ξ[Meshing.get_num_faces(mesh)+1:end]
 
 # print(norm(p - p_true))
 println(Mixed.norm_L2(mesh, k, p, p_sol))
 println(Mixed.norm_L2(mesh, k, u, u_sol))
+
 
 ##-------------- Interpolate using Dierckx.jl, then plot --------------#
 using Dierckx
@@ -56,7 +74,7 @@ p_true = [p_sol(x) for x in eachrow(mesh.cell_centroids)]
 xC_list = unique(sort(mesh.cell_centroids[:,1]))
 yC_list = unique(sort(mesh.cell_centroids[:,2]))
 
-ph_spl = Dierckx.Spline2D(mesh.cell_centroids[:,1],mesh.cell_centroids[:,2],p,s=100) # s is "smoothing factor", needs >0.0 default to work
+ph_spl = Dierckx.Spline2D(mesh.cell_centroids[:,1],mesh.cell_centroids[:,2],p,s=1) # s is "smoothing factor", needs >0.0 default to work
 Zph = evalgrid(ph_spl,xC_list,yC_list)
 
 heatmap(xC_list, yC_list, Zph',
@@ -69,7 +87,7 @@ Zp = evalgrid(p_spl,xC_list,yC_list)
 hms = [heatmap(xC_list, yC_list, Zph',
 #        c=cgrad([:blue,:white,:red]),
         xlabel="x", ylabel="y", xlims = (0,1), ylims=(0,1),
-        title="VEM solution", aspect_ratio = :equal),
+        title="Prec VEM solution", aspect_ratio = :equal),
        heatmap(xC_list, yC_list, Zp',
 #        c=cgrad([:blue,:white,:red]),
         xlabel="x", ylabel="y", xlims = (0,1), ylims=(0,1),

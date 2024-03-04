@@ -103,7 +103,7 @@ function assemble_rhs(mesh, k, source, p_naturalBC)
     b = zeros(Meshing.get_num_cells(mesh) + Meshing.get_num_faces(mesh))
 
     bdry_dofs = Meshing.get_bdry_dofs(mesh)[2] # Gets the face dofs
-    for face in findnz(bdry_dofs)[1] # Loops over boundary faces
+    for face in findnz(sparse(bdry_dofs))[1] # Loops over boundary faces
         orient = -mesh.cell_faces[face, :].nzval[1] # Is there a nicer way to remove brackets around a singleton [x]?
         b[face] += orient * p_naturalBC(Meshing.get_face_centers(mesh, face))
     end
