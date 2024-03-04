@@ -21,7 +21,7 @@ end
 function element_projection_matrices(mesh, cell, k)
 
     # geometry information
-    faces, orient_val = findnz(mesh.cell_faces[:, cell])
+    faces, orient_vals = findnz(mesh.cell_faces[:, cell])
 
     h = mesh.cell_diams[cell]
     centroid = mesh.cell_centroids[cell, :]
@@ -35,7 +35,7 @@ function element_projection_matrices(mesh, cell, k)
 
     D = normals * grads
 
-    C = [Monomials.eval_scaled_mon(fc[j, :], centroid, h, α) * orient_val[j] for α in eachrow(monExps), j in 1:size(orient_val, 1)]
+    C = [Monomials.eval_scaled_mon(c, centroid, h, α) * orient_val for α in eachrow(monExps), (c, orient_val) in zip(eachrow(fc), orient_vals)]
 
     G = C * D
 

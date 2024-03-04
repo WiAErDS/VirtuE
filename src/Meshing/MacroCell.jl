@@ -29,11 +29,9 @@ function init_macro(mesh::Meshing.Mesh, C::Float64, itf_faces)
 end
 
 function find_small_cells(mesh, cut_cells, ref_size)
-    small_cells = spzeros(Bool, Meshing.get_num_cells(mesh))
 
-    for cell in cut_cells.nzind
-        small_cells[cell] = mesh.cell_areas[cell] < ref_size
-    end
+    small_cells = spzeros(Bool, Meshing.get_num_cells(mesh))
+    small_cells[cut_cells.nzind] = mesh.cell_areas[cut_cells.nzind] .< ref_size
 
     return small_cells
 end

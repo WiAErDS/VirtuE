@@ -55,7 +55,7 @@ function create_node_loop(face_nodes)
     nodes = zeros(Int, size(face_nodes, 2))
     nodes[1] = i_node[1]
 
-    for j = 2:size(nodes, 1)
+    for j in eachindex(nodes)[2:end]
         next_face = i_face[findfirst((i_node .== nodes[j-1]) .& (i_value .< 0))]
         nodes[j] = i_node[findfirst((i_face .== next_face) .& (i_value .> 0))]
     end
@@ -67,7 +67,7 @@ function compute_cell_nodes(cell_faces, face_nodes)
 
     cell_nodes = fill(Int[], size(cell_faces, 2))
 
-    for el in 1:size(cell_faces, 2)
+    for el in axes(cell_faces, 2)
         faces_el = get_rowvals(cell_faces, el) # Find faces adjacent to cell
         face_nodes_el = face_nodes[:, faces_el] * spdiagm(0 => cell_faces[faces_el, el]) # Extract positively oriented face_node connectivity
         cell_nodes[el] = create_node_loop(face_nodes_el)

@@ -44,7 +44,7 @@ function quad_integral_el(coords, fun::Function, quad_order::Int)
         ∫fun = integrate_tri(coords, fun, quad_order)
     else
         triangulation = MiniQhull.delaunay(Array(coords'))' # ' transposes the vector
-        for k in 1:size(triangulation, 1) # add contributions from each triangle
+        for k in axes(triangulation, 1) # add contributions from each triangle
             coords_tri = coords[triangulation[k, :], :]
             ∫fun += integrate_tri(coords_tri, fun, quad_order)
         end
