@@ -530,7 +530,9 @@ function draw_mesh(mesh)
 
     for k in 1:get_num_faces(mesh)
         vertices = get_rowvals(mesh.face_nodes, k)
-        Plots.plot!(plt, mesh.node_coords[vertices, 1], mesh.node_coords[vertices, 2], linecolor="black")
+        # Plots.plot!(plt, mesh.node_coords[vertices, 1], mesh.node_coords[vertices, 2], linecolor="black") 
+        Plots.plot!(plt, mesh.node_coords[vertices, 1], mesh.node_coords[vertices, 2], linecolor="black", 
+            xticks = 0:0.1:1, yticks = 0:0.1:1, xlims = (-0.1,1.1), ylims = (-0.1,1.1))
     end
     display(plt)
     return plt
