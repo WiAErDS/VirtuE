@@ -97,7 +97,10 @@ function assemble_lhs(mesh, k, μ_inv=x -> 1)
     return [M -B'; B zero_mat]
 end
 
-function assemble_rhs(mesh, k, source, p_naturalBC)
+"""
+- M is mixed VEM mass matrix
+"""
+function assemble_rhs(mesh, k, source, p_naturalBC, M)
     @assert(k == 0, "Only implemented k=0")
 
     b = zeros(Meshing.get_num_cells(mesh) + Meshing.get_num_faces(mesh))
@@ -108,11 +111,33 @@ function assemble_rhs(mesh, k, source, p_naturalBC)
         b[face] += orient * p_naturalBC(Meshing.get_face_centers(mesh, face))
     end
 
+    source_dofs = interpolate_fun(mesh, k, source)
+    for face in Meshing.get_num_faces(mesh)
+        b[face] += M*source_dofs
+    end
+
     for cell in 1:Meshing.get_num_cells(mesh) # Loops over mesh elements
         b[cell+Meshing.get_num_faces(mesh)] += Meshing.get_poly_area(mesh, cell) * source(Meshing.get_poly_centroid(mesh, cell))
     end
 
     return b # can't A\b for sparse vectors
+end
+
+""" Computes the dof vector of the interpolant to a source funciton
+- fun is the function to be interpolated
+"""
+function interpolate_fun(mesh, k, fun)
+    @assert(k == 0, "Only implemented k=0")
+
+    num_faces = Meshing.get_num_faces(mesh)
+    fun_dofs = zeros(num_faces)
+    for face in 1:num_faces # Loops over boundary faces
+        # orient = -mesh.cell_faces[face, :].nzval[1] # Is there a nicer way to remove brackets around a singleton [x]?
+        face_normal = Meshing.get_face_normals(mesh, face)
+        fun_dofs[face] = norm(face_normal) * dot(source(Meshing.get_face_centers(mesh, face)), face_normal)
+    end
+
+    return fun_dofs
 end
 
 """ Computes L2 norm of a function

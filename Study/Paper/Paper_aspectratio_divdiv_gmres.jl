@@ -78,6 +78,10 @@ using VirtuE
         # Meshing.draw_line_on_mesh(plt, mesh, levelset)
     end
 
+    " CHOOSE PRECONDITIONER "
+    preconditioner_choice = "energy"
+    # preconditioner_choice = "face"
+
     diam_list = ["Diameters"]
     cond_list = ["κ(M)"]
     diagcond_list = ["κ(diagM/M)"]
@@ -89,8 +93,10 @@ using VirtuE
         # Problem matrices and preconditioning
         M = AuxPrecond.assemble_mixed_energy_matrix(meshes[i], k);
         M_diag = spdiagm(diag(M))
-        P = AuxPrecond.AuxPreconditioner("energy",meshes[i]);
-        # P = AuxPrecond.AuxPreconditioner("face",mesh);
+        # P = AuxPrecond.AuxPreconditioner(preconditioner_choice,meshes[i]);
+        # M_prec = AuxPrecond.apply_precond_to_mat(P, collect(M))
+        P = AuxPrecondMultiplicative.AuxPreconditionerMultiplicative(preconditioner_choice,meshes[i]);
+        M_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, collect(M))
 
         b = randn(size(M, 1))
         restart = size(b, 1)
@@ -116,7 +122,6 @@ using VirtuE
         eigs_diag = extrema(abs.(eigvals(collect(M_diag\M))))
         diagcond_list = [diagcond_list..., eigs_diag[2] / eigs_diag[1]]
 
-        M_prec = AuxPrecond.apply_precond_to_mat(P, collect(M))
         eigs_prec = extrema(abs.(eigvals(collect(M_prec))))
         auxcond_list = [auxcond_list..., eigs_prec[2] / eigs_prec[1]]
         # auxcond_list = [auxcond_list..., cond(collect(M_prec))]
@@ -126,6 +131,39 @@ using VirtuE
     # iter_list = [0, 1, 2, 3, 4, 5, 6]
     # eps_list = [5 * 10.0^(-i) for i in 4:9]
 
-    table = [diam_list cond_list diagcond_list auxcond_list gmres_list diaggmres_list auxgmres_list]
+    table = [diam_list cond_list diagcond_list auxcond_list gmres_list diaggmres_list auxgmres_list];
     display(table[:,1:4])
     display(table[:,5:end])
+
+    using Printf
+    # Open a file in write mode
+    open("Study/Paper/Paper_aspectratio_divdiv_gmres_"*preconditioner_choice*".txt", "w") do file
+        # Write the matrix to the file with formatting
+        for i in 1:size(table, 1)
+            if i == 1 
+                write(file, lpad(string(table[i, 1]), 5))
+                write(file, lpad(string(table[i, 2]), 17))
+                write(file, lpad(string(table[i, 3]), 18))
+                write(file, lpad(string(table[i, 4]), 12))
+                write(file, lpad(string(table[i, 5]), 34))
+                write(file, lpad(string(table[i, 6]), 34))
+                write(file, lpad(string(table[i, 7]), 34))
+                write(file, "\n") # New line at the end of each row
+            else
+                for j in 1:size(table, 2)
+                    # Check if the element is a number
+                    if isa(table[i, j], Number)
+                        # Format numbers in scientific notation
+                        formatted_number = @sprintf("%.2E", table[i, j])
+                        write(file, lpad(formatted_number, 15))
+                    else
+                        # Just write the string as it is, left-aligned
+                        write(file, lpad(string(table[i, j]), 40))
+                    end
+                end
+                write(file, "\n") # New line at the end of each row
+            end
+        end
+    end
+
+

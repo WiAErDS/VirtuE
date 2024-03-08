@@ -56,11 +56,14 @@ function assemble_smoother(smoother_choice, mesh, E_div::SparseMatrixCSC)
     if smoother_choice == "energy"
         return E_div
     else 
-        # h = maximum(mesh.cell_diams)
-        face_tangents = Meshing.get_tangents(mesh)
-        hm2 = sparsevec([1/norm(face_tangents[i,:])^2 for i = 1:length(face_tangents[:,1])])
+        h = maximum(mesh.cell_diams)
         M_F = spdiagm(ones(Meshing.get_num_faces(mesh))) # h (u*n,v*n)_F (look at action on basis functions)
-        return M_F * hm2 # 1/h^2 * M_F
+        return 1/h^2 * M_F
+
+        # face_tangents = Meshing.get_tangents(mesh)
+        # hm2 = sparsevec([1/norm(face_tangents[i,:])^2 for i = 1:length(face_tangents[:,1])])
+        # M_F = spdiagm(ones(Meshing.get_num_faces(mesh))) # h (u*n,v*n)_F (look at action on basis functions)
+        # return M_F * hm2
     end
 end
 
@@ -123,8 +126,8 @@ end
 """
 Constructor
 """
-function AuxPreconditioner_Darcy(mesh::Meshing.Mesh, k=0, μ_inv=x -> 1)
-    P = AuxPreconditioner(mesh, k, μ_inv)
+function AuxPreconditioner_Darcy(smoother_choice, mesh::Meshing.Mesh, k=0, μ_inv=x -> 1)
+    P = AuxPreconditioner(smoother_choice, mesh, k, μ_inv)
     M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)       # mass matrix for Darcy system
 
     return AuxPreconditioner_Darcy(P, M_0)

@@ -1,4 +1,4 @@
-module AuxPrecond
+module AuxPrecondMultiplicative
 
 using SparseArrays
 using LinearAlgebra
@@ -7,7 +7,7 @@ import ..Primal
 import ..Mixed
 import ..Meshing
 
-struct AuxPreconditioner
+struct AuxPreconditionerMultiplicative
     S::SparseMatrixCSC
     E_p::SparseMatrixCSC
     E_div::SparseMatrixCSC
@@ -18,20 +18,20 @@ end
 """
 Constructor s
 """
-function AuxPreconditioner(smoother_choice, mesh, k=0, μ_inv=x -> 1)
+function AuxPreconditionerMultiplicative(smoother_choice, mesh, k=0, μ_inv=x -> 1)
     E_p = assemble_primal_energy_matrix(mesh, k + 1, μ_inv) # (u,v) + (grad u, grad v)
     E_div = assemble_mixed_energy_matrix(mesh, k, μ_inv)    # (u,v) + (div u, div v)
     S = assemble_smoother(smoother_choice, mesh, E_div)
     Π = assemble_div_projector_matrix(mesh)                 # Π_h
     C = curl(mesh)                                          # curl
 
-    return AuxPreconditioner(S, E_p, E_div, Π, C)
+    return AuxPreconditionerMultiplicative(S, E_p, E_div, Π, C)
 end
 
 """
 Apply the auxiliary space preconditioner P to a vector v
 """
-function (\)(P::AuxPreconditioner, r::AbstractVector)
+function (\)(P::AuxPreconditionerMultiplicative, r::AbstractVector)
     """
     Multiplicative:
     """
@@ -114,9 +114,13 @@ end
 """
 Applies the preconditioner P to dense matrix Mat that scales as divdiv
 """
-function apply_precond_to_mat(P::Union{AuxPreconditioner}, Mat)
+function apply_precond_to_mat(P::AuxPreconditionerMultiplicative, Mat)
     M_prec = (collect(P \ col) for col in eachcol(Mat))
     return hcat(M_prec...)
 end
+
+LinearAlgebra.ldiv!(D::AuxPreconditionerMultiplicative, v::AbstractVector) = v .= D \ v
+LinearAlgebra.ldiv!(y, D::AuxPreconditionerMultiplicative, v::AbstractVector) = y .= D \ v
+
 
 end
