@@ -71,9 +71,16 @@ for N in [5,10,20]
     meshes = [meshes..., mesh]
 end
 
+# RHS data (from Study/Mixed_convg.jl)
+source_vector(x) = -[2π * cos(2π * x[1]) * sin(4π * x[2]), 4π * cos(4π * x[2]) * sin(2π * x[1])]
+
 " CHOOSE PRECONDITIONER "
-# preconditioner_choice = "energy"
-preconditioner_choice = "face"
+# smoother_choice = "energy"
+smoother_choice = "face"
+
+" CHOOSE ADDITIVE OR MULTIPLICATIVE"
+preconditioner_choice = "additive"
+# preconditioner_choice = "multiplicative"
 
 k = 0 # Polynomial degree
 diam_list = ["Diameters"]
@@ -103,8 +110,10 @@ for i = 1:length(meshes)
     M_diag = spdiagm(diag(M))
     P = AuxPrecond.AuxPreconditioner(preconditioner_choice,mesh);
     M_prec = AuxPrecond.apply_precond_to_mat(P, collect(M))
-    # P = AuxPrecondMultiplicative.AuxPreconditionerMultiplicative(preconditioner_choice,mesh);
-    # M_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, collect(M))
+    if preconditioner_choice == "multiplicative"
+        P = AuxPrecondMultiplicative.AuxPreconditionerMultiplicative(preconditioner_choice,mesh);
+        M_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, collect(M))
+    end
 
     b = randn(size(M, 1))
     restart = size(b, 1)
@@ -142,7 +151,7 @@ table[:,5:end]
 
 using Printf
 # Open a file in write mode
-open("Study/Paper/Paper_refine_divdiv_gmres_"*preconditioner_choice*".txt", "w") do file
+open("Study/Paper/Paper_refine_divdiv_"*preconditioner_choice*"_"*smoother_choice*".txt", "w") do file
     # Write the matrix to the file with formatting
     for i in 1:size(table, 1)
         if i == 1 

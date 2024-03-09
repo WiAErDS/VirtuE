@@ -24,26 +24,39 @@ levelset(x) = norm(x - center) - radius
 # source(x) = 0
 # p_bdry(x) = 1 - x[1]
 
-source_scalar(x) = 40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
-p_bdry(x) = 0
-u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
-p_sol(x) = 2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+# source_scalar(x) = 40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+# source_vector(x) = [0, 0]
+# p_bdry(x) = 0
+# u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
+# p_sol(x) = 2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+
+# source_scalar(x) = 40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+# source_vector(x) = -[2π * cos(2π * x[1]) * sin(4π * x[2]), 4π * cos(4π * x[2]) * sin(2π * x[1])]
+# p_bdry(x) = 0
+# u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
+# p_sol(x) = sin(2 * π * x[1]) * sin(4 * π * x[2])
 
 # source_scalar(x) = 0
 # p_sol(x) = -sin(x[1])*sinh(x[2]) - (cos(1) - 1)*(cosh(1) - 1)
 # u_sol(x) = [cos(x[1])*sinh(x[2]), sin(x[1])*cosh(x[2])]
 # p_bdry(x) = p_sol(x)
 
-for N = 2 .^ (1:6) # size of mesh
+source_scalar(x) = 0
+source_vector(x) = [cos(x[1])*sinh(x[2]), sin(x[1])*cosh(x[2])]
+p_sol(x) = -sin(x[1])*sinh(x[2]) - (cos(1) - 1)*(cosh(1) - 1)
+u_sol(x) = 2*[cos(x[1])*sinh(x[2]), sin(x[1])*cosh(x[2])]
+p_bdry(x) = p_sol(x)
+
+for N = 2 .^ (1:5) # size of mesh
     # for N = 10:1:29
     append!(h, 1 / N)
     mesh = Meshing.create_tri_mesh(N)
     mesh = Meshing.remesh(mesh, levelset)
 
-    A, _, ξ = Mixed.Darcy_setup(mesh, k, source_scalar, p_bdry, μ_inv)
+    A, _, ξ = Mixed.Darcy_setup(mesh, k, source_scalar, source_vector, p_bdry, μ_inv)
 
     u = ξ[1:Meshing.get_num_faces(mesh)]
-    p = ξ[Meshing.get_num_faces(mesh)+1:end]
+    p = ξ[(Meshing.get_num_faces(mesh)+1):end]
 
     u_error = Mixed.norm_L2(mesh, k, u, u_sol)
     p_error = Mixed.norm_L2(mesh, k, p, p_sol)

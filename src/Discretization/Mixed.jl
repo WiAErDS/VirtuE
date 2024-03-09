@@ -9,9 +9,9 @@ import ..NumIntegrate
 import ..Primal # needed only for assemble_divdiv_matrix
 
 #-------------- Mixed VEM k=0 --------------#
-function Darcy_setup(mesh, k, source::Function, p_naturalBC::Function, μ_inv::Function=x -> 1)
-    A = assemble_lhs(mesh, k, μ_inv)
-    b = assemble_rhs(mesh, k, source, p_naturalBC)
+function Darcy_setup(mesh, k, source_cells::Function, source_faces::Function, p_naturalBC::Function, μ_inv::Function=x -> 1)
+    A,M = assemble_lhs(mesh, k, μ_inv)
+    b = assemble_rhs(mesh, k, source_cells, source_faces, p_naturalBC, M)
 
     ξ = A \ b
 
@@ -86,6 +86,7 @@ function assemble_divdiv_matrix(mesh, k, μ_inv=x -> 1)
     return B' * (M_0 \ B)
 end
 
+# u = -∇p + f, div u = g + div f, (-Δp=g)
 function assemble_lhs(mesh, k, μ_inv=x -> 1)
     @assert(k == 0, "Only implemented k=0")
 
@@ -94,16 +95,18 @@ function assemble_lhs(mesh, k, μ_inv=x -> 1)
 
     zero_mat = zeros(size(B, 1), size(B, 1))
 
-    return [M -B'; B zero_mat]
+    return [M -B'; B zero_mat], M
 end
 
 """
 - M is mixed VEM mass matrix
 """
-function assemble_rhs(mesh, k, source, p_naturalBC, M)
+function assemble_rhs(mesh, k, source_cells, source_faces, p_naturalBC, M)
     @assert(k == 0, "Only implemented k=0")
 
-    b = zeros(Meshing.get_num_cells(mesh) + Meshing.get_num_faces(mesh))
+    num_cells = Meshing.get_num_cells(mesh)
+    num_faces = Meshing.get_num_faces(mesh)
+    b = zeros(num_cells + num_faces)
 
     bdry_dofs = Meshing.get_bdry_dofs(mesh)[2] # Gets the face dofs
     for face in findnz(sparse(bdry_dofs))[1] # Loops over boundary faces
@@ -111,16 +114,29 @@ function assemble_rhs(mesh, k, source, p_naturalBC, M)
         b[face] += orient * p_naturalBC(Meshing.get_face_centers(mesh, face))
     end
 
-    source_dofs = interpolate_fun(mesh, k, source)
-    for face in Meshing.get_num_faces(mesh)
-        b[face] += M*source_dofs
-    end
+    source_dofs = interpolate_fun(mesh, k, source_faces)
+    b[1:num_faces] += M*source_dofs
 
-    for cell in 1:Meshing.get_num_cells(mesh) # Loops over mesh elements
-        b[cell+Meshing.get_num_faces(mesh)] += Meshing.get_poly_area(mesh, cell) * source(Meshing.get_poly_centroid(mesh, cell))
+    for cell in 1:num_cells # Loops over mesh elements
+        b[cell+Meshing.get_num_faces(mesh)] += Meshing.get_poly_area(mesh, cell) * source_cells(Meshing.get_poly_centroid(mesh, cell))
     end
 
     return b # can't A\b for sparse vectors
+end
+
+"""
+- M is mixed VEM mass matrix
+"""
+function assemble_divdiv_rhs(mesh, k, source_faces, M)
+    @assert(k == 0, "Only implemented k=0")
+
+    num_faces = Meshing.get_num_faces(mesh)
+    b = zeros(num_faces)
+
+    source_dofs = interpolate_fun(mesh, k, source_faces)
+    b[1:num_faces] += M*source_dofs
+
+    return b
 end
 
 """ Computes the dof vector of the interpolant to a source funciton
@@ -134,7 +150,8 @@ function interpolate_fun(mesh, k, fun)
     for face in 1:num_faces # Loops over boundary faces
         # orient = -mesh.cell_faces[face, :].nzval[1] # Is there a nicer way to remove brackets around a singleton [x]?
         face_normal = Meshing.get_face_normals(mesh, face)
-        fun_dofs[face] = norm(face_normal) * dot(source(Meshing.get_face_centers(mesh, face)), face_normal)
+        # fun_dofs[face] = norm(face_normal) * dot(fun(Meshing.get_face_centers(mesh, face)), face_normal)
+        fun_dofs[face] = dot(fun(Meshing.get_face_centers(mesh, face)), face_normal)
     end
 
     return fun_dofs

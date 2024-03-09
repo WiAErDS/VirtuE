@@ -62,7 +62,6 @@ using VirtuE
     N = 10 # size of mesh
     # offset = 1/4N
     mesh = Meshing.create_rect_mesh(N);
-
     for i = 1:N/2
         r = i/(N+0.5)#+offset*(i==N/2)
         # println(r)
@@ -78,9 +77,16 @@ using VirtuE
         # Meshing.draw_line_on_mesh(plt, mesh, levelset)
     end
 
+    # RHS data (from Study/Mixed_convg.jl)
+    source_vector(x) = [cos(x[1])*sinh(x[2]), sin(x[1])*cosh(x[2])]
+
     " CHOOSE PRECONDITIONER "
-    preconditioner_choice = "energy"
-    # preconditioner_choice = "face"
+    # smoother_choice = "energy"
+    smoother_choice = "face"
+
+    " CHOOSE ADDITIVE OR MULTIPLICATIVE"
+    preconditioner_choice = "additive"
+    # preconditioner_choice = "multiplicative"
 
     diam_list = ["Diameters"]
     cond_list = ["κ(M)"]
@@ -93,12 +99,15 @@ using VirtuE
         # Problem matrices and preconditioning
         M = AuxPrecond.assemble_mixed_energy_matrix(meshes[i], k);
         M_diag = spdiagm(diag(M))
-        # P = AuxPrecond.AuxPreconditioner(preconditioner_choice,meshes[i]);
-        # M_prec = AuxPrecond.apply_precond_to_mat(P, collect(M))
-        P = AuxPrecondMultiplicative.AuxPreconditionerMultiplicative(preconditioner_choice,meshes[i]);
-        M_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, collect(M))
-
-        b = randn(size(M, 1))
+        P = AuxPrecond.AuxPreconditioner(preconditioner_choice,meshes[i]);
+        M_prec = AuxPrecond.apply_precond_to_mat(P, collect(M))
+        if preconditioner_choice == "multiplicative"
+            P = AuxPrecondMultiplicative.AuxPreconditionerMultiplicative(preconditioner_choice,meshes[i]);
+            M_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, collect(M))
+        end
+        
+        # b = randn(size(M, 1))
+        b = Mixed.assemble_divdiv_rhs(meshes[i], k, source_vector, Mixed.assemble_mass_matrix(meshes[i], k))
         restart = size(b, 1)
 
         x_unpr, log_unpr = gmres(M, b, restart=restart, log=true);
@@ -137,7 +146,7 @@ using VirtuE
 
     using Printf
     # Open a file in write mode
-    open("Study/Paper/Paper_aspectratio_divdiv_gmres_"*preconditioner_choice*".txt", "w") do file
+    open("Study/Paper/Paper_aspectratio_divdiv_"*preconditioner_choice*"_"*smoother_choice*".txt", "w") do file
         # Write the matrix to the file with formatting
         for i in 1:size(table, 1)
             if i == 1 
