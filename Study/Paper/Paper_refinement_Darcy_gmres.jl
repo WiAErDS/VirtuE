@@ -5,107 +5,145 @@ using IterativeSolvers
 using Revise
 using VirtuE
 
+## -------------- Darcy precond testing grounds --------------#
+    k = 0 # Polynomial degree
+
+    μ_inv(x) = [1 0; 0 1]
+    # source_scalar(x) = 40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+    # p_bdry(x) = 0
+    # u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
+    # p_sol(x) = 2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+
+    N = 10 # size of mesh
+
+    eps = 5 * 10.0^-4
+
+    mesh = Meshing.create_tri_mesh(N)
+
+    levelset(x) = x[2] - (0.5 + eps)
+    mesh = Meshing.remesh(mesh, levelset)
+
+    M = Mixed.assemble_lhs(mesh, k, μ_inv)
+    P = AuxPrecond.AuxPreconditioner_Darcy(mesh)
+
+    b = randn(size(M, 1))
+    restart = size(b, 1)
+
+    x_unpr, log_unpr = gmres(M, b, restart=restart, log=true)
+    x_prec, log_prec = gmres(M, b, Pl=P, restart=restart, log=true)
+
+    println("Unpreconditioned: ", log_unpr)
+    println("Preconditioned: ", log_prec)
+
+## -------------- Darcy refinement tests --------------#
+meshes = []
+for N in [5,10,20]
+    mesh = Meshing.create_rect_mesh(N);
+
+    h = 1/N #maximum(mesh.cell_diams)
+    p = 1
+    r = 0.75*h # 0.35, 2/3, 0.75
+    nodes = mesh.node_coords
+    for (x, y) in eachrow(nodes)
+        levelset_0(z) = (abs(z[1]-x))^p + (abs(z[2]-y))^p - r^p
+        mesh = Meshing.remesh(mesh, levelset_0);
+    end
+    meshes = [meshes..., mesh]
+end
+
+# RHS data (from Study/Mixed_convg.jl)
+source_scalar(x) = 40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+source_vector(x) = -[2π * cos(2π * x[1]) * sin(4π * x[2]), 4π * cos(4π * x[2]) * sin(2π * x[1])]
+p_bdry(x) = 0
+u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
+p_sol(x) = sin(2 * π * x[1]) * sin(4 * π * x[2])
+
+" THERE IS ONLY ADDITIVE "
+preconditioner_choice = "additive"
+
+" CHOOSE PRECONDITIONER "
+# smoother_choice = "energy"
+smoother_choice = "face"
 
 k = 0 # Polynomial degree
+diam_list = ["Diameters"]
+cond_list = ["κ(M)"]
+diagcond_list = ["κ(diagM/M)"]
+auxcond_list = ["κ(PM)"]
+gmres_list = ["GMRES M"]
+diaggmres_list = ["GMRES diagM/M"]
+auxgmres_list = ["GMRES PM"]
 
-μ_inv(x) = [1 0; 0 1]
-# source_scalar(x) = 40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
-# p_bdry(x) = 0
-# u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
-# p_sol(x) = 2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+for i = 1:length(meshes)
+    mesh = meshes[i]
+    # Problem matrices and preconditioning
+    A,M = Mixed.assemble_lhs(mesh, k)
+    P_diag = spdiagm(vcat(diag(M), ones(Meshing.get_num_cells(mesh))))
+    P = AuxPrecond.AuxPreconditioner_Darcy(smoother_choice,mesh);
+    A_prec = AuxPrecond.apply_precond_to_mat(P, collect(A))
 
-N = 10 # size of mesh
+    # b = randn(size(M, 1))
+    b = Mixed.assemble_rhs(mesh, k, source_scalar, source_vector, p_bdry, M)
+    restart = size(b, 1)
 
-eps = 5 * 10.0^-4
+    x_unpr, log_unpr = gmres(A, b, restart=restart, log=true);
+    x_diag, log_diag = gmres(P_diag\A, P_diag\b, restart=restart, log=true);
+    x_prec, log_prec = gmres(A, b, Pl=P, restart=restart, log=true);
 
-mesh = Meshing.create_tri_mesh(N)
+    gmres_list = [gmres_list..., log_unpr]
+    diaggmres_list = [diaggmres_list..., log_diag]
+    auxgmres_list = [auxgmres_list..., log_prec]
 
-levelset(x) = x[2] - (0.5 + eps)
-mesh = Meshing.remesh(mesh, levelset)
+    # Aspect ratios as indicator for cond nbrs 
+    areas = mesh.cell_areas
+    diams = mesh.cell_diams
+    aspect_ratios = diams .^ 2 ./ areas
+    diam_list = [diam_list..., maximum(aspect_ratios)]
 
-M = Mixed.assemble_lhs(mesh, k, μ_inv)
-P = AuxPrecond.AuxPreconditioner_Darcy(mesh)
+    # Condition numbers
+    eigs = extrema(abs.(eigvals(collect(A))))
+    cond_list = [cond_list..., eigs[2] / eigs[1]]
 
-b = randn(size(M, 1))
-restart = size(b, 1)
+    eigs_diag = extrema(abs.(eigvals(collect(P_diag\A))))
+    diagcond_list = [diagcond_list..., eigs_diag[2] / eigs_diag[1]]
 
-x_unpr, log_unpr = gmres(M, b, restart=restart, log=true)
-x_prec, log_prec = gmres(M, b, Pl=P, restart=restart, log=true)
+    eigs_prec = extrema(abs.(eigvals(collect(A_prec))))
+    auxcond_list = [auxcond_list..., eigs_prec[2] / eigs_prec[1]]
+end
+# iter_list = [0, 1, 2, 3, 4, 5, 6]
+# eps_list = [5 * 10.0^(-i) for i in 4:9]
 
-println("Unpreconditioned: ", log_unpr)
-println("Preconditioned: ", log_prec)
+table = [diam_list cond_list diagcond_list auxcond_list gmres_list diaggmres_list auxgmres_list]
+# table[:,1:4]
+# table[:,5:end]
 
-
-# ##-------------- Preconditioned Darcy system iterative solver check --------------#
-
-# # ----- Problem setup 
-# levelset(x) = x[2] - (0.5 + 1e-6)
-
-# μ_inv(x) = [1 0; 0 1]
-
-# # source(x) = 0
-# # p_bdry(x) = 1 - x[1]
-
-# source_scalar(x) = 40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
-# p_bdry(x) = 0
-# u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
-# p_sol(x) = 2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
-
-# # source_scalar(x) = 0
-# # p_sol(x) = -sin(x[1])*sinh(x[2]) - (cos(1) - 1)*(cosh(1) - 1)
-# # u_sol(x) = [cos(x[1])*sinh(x[2]), sin(x[1])*cosh(x[2])]
-# # p_bdry(x) = p_sol(x)
-
-# k = 0 # Polynomial degree
-
-# # ----- Output vectors
-
-# h_list = []
-# u_errors = []
-# p_errors = []
-# u_errors_prec = []
-# p_errors_prec = []
-# cond_nbrs = []
-# cond_nbrs_prec = []
-
-# # ----- Computing loop
-# for N = 10 * 2 .^ (0:1)
-#     append!(h_list, 1 / N)
-
-#     mesh = Meshing.create_tri_mesh(N)
-#     mesh = Meshing.remesh(mesh, levelset)
-#     num_faces = Meshing.get_num_faces(mesh)
-
-#     M = Mixed.assemble_lhs(mesh, k, μ_inv)
-#     b = Mixed.assemble_rhs(mesh, k, source_scalar, p_bdry)
-#     ξ = @time gmres(M, b)#; verbose=true)
-
-#     u = ξ[1:Meshing.get_num_faces(mesh)]
-#     p = ξ[Meshing.get_num_faces(mesh)+1:end]
-#     u_error = Mixed.norm_L2(mesh, k, u, u_sol)
-#     p_error = Mixed.norm_L2(mesh, k, p, p_sol)
-#     append!(u_errors, u_error)
-#     append!(p_errors, p_error)
-
-#     # M[num_faces+1:end, :] *= -1 # symmetrize the system
-#     P = AuxPrecond.AuxPreconditioner(mesh)
-#     PQ_inv = AuxPrecond.get_mat_for_gmres_darcy(P)
-#     PQ_inv = factorize(PQ_inv)
-#     # M_prec = AuxPrecond.apply_Darcy_precond_to_mat(P, M)
-#     # b_prec = AuxPrecond.apply_Darcy_precond_to_mat(P, b)
-#     ξ_prec = @time gmres(M, b; Pl=PQ_inv)
-
-#     u_prec = ξ[1:Meshing.get_num_faces(mesh)]
-#     p_prec = ξ[Meshing.get_num_faces(mesh)+1:end]
-#     u_error_prec = Mixed.norm_L2(mesh, k, u, u_sol)
-#     p_error_prec = Mixed.norm_L2(mesh, k, p, p_sol)
-#     append!(u_errors_prec, u_error_prec)
-#     append!(p_errors_prec, p_error_prec)
-
-#     # eigs = extrema(abs.(eigvals(collect(M))))
-#     # append!(cond_nbrs, eigs[2] / eigs[1])
-#     # eigs_prec = extrema(abs.(eigvals(collect(M_prec))))
-#     # append!(cond_nbrs_prec, eigs_prec[2] / eigs_prec[1])
-# end
-
-# display(hcat(h_list, cond_nbrs, cond_nbrs_prec)')
+using Printf
+# Open a file in write mode
+open("Study/Paper/Refine_darcy/Paper_refine_darcy_"*preconditioner_choice*"_"*smoother_choice*".txt", "w") do file
+    # Write the matrix to the file with formatting
+    for i in 1:size(table, 1)
+        if i == 1 
+            write(file, lpad(string(table[i, 1]), 5))
+            write(file, lpad(string(table[i, 2]), 17))
+            write(file, lpad(string(table[i, 3]), 18))
+            write(file, lpad(string(table[i, 4]), 12))
+            write(file, lpad(string(table[i, 5]), 34))
+            write(file, lpad(string(table[i, 6]), 34))
+            write(file, lpad(string(table[i, 7]), 34))
+            write(file, "\n") # New line at the end of each row
+        else
+            for j in 1:size(table, 2)
+                # Check if the element is a number
+                if isa(table[i, j], Number)
+                    # Format numbers in scientific notation
+                    formatted_number = @sprintf("%.2E", table[i, j])
+                    write(file, lpad(formatted_number, 15))
+                else
+                    # Just write the string as it is, left-aligned
+                    write(file, lpad(string(table[i, j]), 40))
+                end
+            end
+            write(file, "\n") # New line at the end of each row
+        end
+    end
+end

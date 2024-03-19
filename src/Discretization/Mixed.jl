@@ -130,11 +130,11 @@ end
 function assemble_divdiv_rhs(mesh, k, source_faces, M)
     @assert(k == 0, "Only implemented k=0")
 
-    num_faces = Meshing.get_num_faces(mesh)
-    b = zeros(num_faces)
+    # num_faces = Meshing.get_num_faces(mesh)
+    # b = zeros(num_faces)
 
     source_dofs = interpolate_fun(mesh, k, source_faces)
-    b[1:num_faces] += M*source_dofs
+    b = M*source_dofs
 
     return b
 end

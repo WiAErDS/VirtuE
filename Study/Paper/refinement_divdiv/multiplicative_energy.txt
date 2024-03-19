@@ -1,0 +1,5 @@
+Diameters κ(M)      κ(diagM/M)   κ(PM)     GMRES M   GMRES diagM/M  GMRES PM  
+1.40E-01  See other See other    9.29       114              24          16  
+6.99E-02  See other See other    9.53       234              121         17  
+3.49E-02  See other See other    9.60       427              220         17  
+1.75E-02  See other See other    9.61       739              350         15  

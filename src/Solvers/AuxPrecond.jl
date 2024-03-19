@@ -20,7 +20,7 @@ Constructor s
 """
 function AuxPreconditioner(smoother_choice, mesh, k=0, μ_inv=x -> 1)
     E_p = assemble_primal_energy_matrix(mesh, k + 1, μ_inv) # (u,v) + (grad u, grad v)
-    E_div = assemble_mixed_energy_matrix(mesh, k, μ_inv)    # (u,v) + (div u, div v)
+    E_div,_ = assemble_mixed_energy_matrix(mesh, k, μ_inv)    # (u,v) + (div u, div v)
     S = assemble_smoother(smoother_choice, mesh, E_div)
     Π = assemble_div_projector_matrix(mesh)                 # Π_h
     C = curl(mesh)                                          # curl
@@ -56,14 +56,13 @@ function assemble_smoother(smoother_choice, mesh, E_div::SparseMatrixCSC)
     if smoother_choice == "energy"
         return E_div
     else 
-        h = maximum(mesh.cell_diams)
-        M_F = spdiagm(ones(Meshing.get_num_faces(mesh))) # h (u*n,v*n)_F (look at action on basis functions)
-        return 1/h^2 * M_F
+        # h = maximum(mesh.cell_diams)
+        # I_F = spdiagm(ones(Meshing.get_num_faces(mesh))) # h (u*n,v*n)_F (look at action on basis functions)
+        # return 1/h^2 * M_F
 
-        # face_tangents = Meshing.get_tangents(mesh)
-        # hm2 = sparsevec([1/norm(face_tangents[i,:])^2 for i = 1:length(face_tangents[:,1])])
-        # M_F = spdiagm(ones(Meshing.get_num_faces(mesh))) # h (u*n,v*n)_F (look at action on basis functions)
-        # return M_F * hm2
+        face_tangents = Meshing.get_tangents(mesh)
+        facenorm_sq_reciprocals = sparsevec([1/norm(face_tangents[i,:])^2 for i = 1:length(face_tangents[:,1])])
+        return spdiagm(facenorm_sq_reciprocals)
     end
 end
 
@@ -78,7 +77,7 @@ end
 function assemble_mixed_energy_matrix(mesh, k, μ_inv=x -> 1)
     M = Mixed.assemble_mass_matrix(mesh, k, μ_inv)
     A_div = Mixed.assemble_divdiv_matrix(mesh, k, μ_inv)
-    return A_div + M
+    return A_div + M, M
 end
 
 

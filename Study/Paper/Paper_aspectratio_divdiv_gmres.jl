@@ -26,7 +26,7 @@ using VirtuE
     # # Meshing.draw_line_on_mesh(plt, mesh, levelset)
 
     # Problem matrices and preconditioning
-    M = AuxPrecond.assemble_mixed_energy_matrix(mesh, k);
+    M,_ = AuxPrecond.assemble_mixed_energy_matrix(mesh, k);
     P = AuxPrecond.AuxPreconditioner("energy",mesh);
     M_diag = spdiagm(diag(M))
 
@@ -34,30 +34,30 @@ using VirtuE
     restart = size(b, 1)
 
     x_unpr, log_unpr = gmres(M, b, restart=restart, log=true);
-    x_diag, log_diag = gmres(M_diag\M, M_diag\b, restart=restart, log=true);
-    x_prec, log_prec = gmres(M, b, Pl=P, restart=restart, log=true);
+    # x_diag, log_diag = gmres(M_diag\M, M_diag\b, restart=restart, log=true);
+    # x_prec, log_prec = gmres(M, b, Pl=P, restart=restart, log=true);
 
-    println("Unpreconditioned: ", log_unpr)
-    println("Diagonal: ", log_diag)
-    println("Preconditioned: ", log_prec)
+    # println("Unpreconditioned: ", log_unpr)
+    # println("Diagonal: ", log_diag)
+    # println("Preconditioned: ", log_prec)
 
-    # Aspect ratios as indicator for cond nbrs 
-    areas = mesh.cell_areas
-    diams = mesh.cell_diams
-    aspect_ratios = diams .^ 2 ./ areas
-    println("Maximum aspect ratio after expansion: ", maximum(aspect_ratios))
+    # # Aspect ratios as indicator for cond nbrs 
+    # areas = mesh.cell_areas
+    # diams = mesh.cell_diams
+    # aspect_ratios = diams .^ 2 ./ areas
+    # println("Maximum aspect ratio after expansion: ", maximum(aspect_ratios))
 
-    # Condition numbers
-    M_prec = AuxPrecond.apply_precond_to_mat(P, collect(M))
-    eigs = extrema(abs.(eigvals(collect(M))))
-    println(eigs[2] / eigs[1])# println(cond(collect(M))) # = above, since symmetric problem
-    eigs_diag = extrema(abs.(eigvals(collect(M_diag\M))))
-    println(eigs_diag[2] / eigs_diag[1])
-    eigs_prec = extrema(abs.(eigvals(collect(M_prec))))
-    println(eigs_prec[2] / eigs_prec[1])# println(cond(collect(M_prec))) = above, since symmetric problem
+    # # Condition numbers
+    # M_prec = AuxPrecond.apply_precond_to_mat(P, collect(M))
+    # eigs = extrema(abs.(eigvals(collect(M))))
+    # println(eigs[2] / eigs[1])# println(cond(collect(M))) # = above, since symmetric problem
+    # eigs_diag = extrema(abs.(eigvals(collect(M_diag\M))))
+    # println(eigs_diag[2] / eigs_diag[1])
+    # eigs_prec = extrema(abs.(eigvals(collect(M_prec))))
+    # println(eigs_prec[2] / eigs_prec[1])# println(cond(collect(M_prec))) = above, since symmetric problem
 
 
-## -------------- (u,v)+(divu,divv) refinement tests --------------#
+## -------------- (u,v)+(divu,divv) aspectratio tests --------------#
     k = 0 # Polynomial degree
     N = 10 # size of mesh
     # offset = 1/4N
@@ -68,7 +68,7 @@ using VirtuE
         levelset_0(x) = (x[1]-0.5)^10 + (x[2]-0.5)^10 - r^10
         mesh = Meshing.remesh(mesh, levelset_0);
     end
-    plt = Meshing.draw_mesh(mesh)
+    # plt = Meshing.draw_mesh(mesh)
     meshes = [mesh]
     for i in 4:9
         eps = 5 * 10.0^(-i)
@@ -85,8 +85,8 @@ using VirtuE
     smoother_choice = "face"
 
     " CHOOSE ADDITIVE OR MULTIPLICATIVE"
-    preconditioner_choice = "additive"
-    # preconditioner_choice = "multiplicative"
+    # preconditioner_choice = "additive"
+    preconditioner_choice = "multiplicative"
 
     diam_list = ["Diameters"]
     cond_list = ["κ(M)"]
@@ -95,14 +95,15 @@ using VirtuE
     gmres_list = ["GMRES M"]
     diaggmres_list = ["GMRES diagM/M"]
     auxgmres_list = ["GMRES PM"]
+    log_unpr = 0
     for i in eachindex(meshes)
         # Problem matrices and preconditioning
-        M = AuxPrecond.assemble_mixed_energy_matrix(meshes[i], k);
+        M,_ = AuxPrecond.assemble_mixed_energy_matrix(meshes[i], k);
         M_diag = spdiagm(diag(M))
-        P = AuxPrecond.AuxPreconditioner(preconditioner_choice,meshes[i]);
+        P = AuxPrecond.AuxPreconditioner(smoother_choice,meshes[i]);
         M_prec = AuxPrecond.apply_precond_to_mat(P, collect(M))
         if preconditioner_choice == "multiplicative"
-            P = AuxPrecondMultiplicative.AuxPreconditionerMultiplicative(preconditioner_choice,meshes[i]);
+            P = AuxPrecondMultiplicative.AuxPreconditionerMultiplicative(smoother_choice,meshes[i]);
             M_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, collect(M))
         end
         
@@ -146,7 +147,7 @@ using VirtuE
 
     using Printf
     # Open a file in write mode
-    open("Study/Paper/Paper_aspectratio_divdiv_"*preconditioner_choice*"_"*smoother_choice*".txt", "w") do file
+    open("Study/Paper/Aspectratio_divdiv/Paper_aspectratio_divdiv_"*preconditioner_choice*"_"*smoother_choice*".txt", "w") do file
         # Write the matrix to the file with formatting
         for i in 1:size(table, 1)
             if i == 1 

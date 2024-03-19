@@ -1,0 +1,2 @@
+Diameters           κ(M)                κ(diagM/M)          κ(PM)               GMRES M             GMRES diagM/M       GMRES PM            
+4.00E+00            3.26E+01            1.56E+01            3.85E+00            
