@@ -44,14 +44,8 @@ function export_result_to_file(mesh_choice, problem_choice, preconditioner_choic
     end
 end
 
-## -------------- test function --------------#
-function tests_for_paper(mesh_choice, problem_choice, smoother_choice, preconditioner_choice, do_all_cond=true)
-    if problem_choice == "darcy" # only additive fo Darcy
-        preconditioner_choice = "additive"
-    end
-
-    k = 0 # Polynomial degree
-
+## -------------- compute meshes --------------#
+function construct_meshes(mesh_choice)
     meshes = []
     if mesh_choice == "aspectratio"
         N = 10 # size of mesh
@@ -86,6 +80,16 @@ function tests_for_paper(mesh_choice, problem_choice, smoother_choice, precondit
             meshes = [meshes..., mesh]
         end
     end
+    return meshes
+end
+
+## -------------- test function --------------#
+function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, preconditioner_choice, do_all_cond=true)
+    if problem_choice == "darcy" # only additive fo Darcy
+        preconditioner_choice = "additive"
+    end
+
+    k = 0 # Polynomial degree
 
     # RHS data (from Study/Mixed_convg.jl)
     source_scalar(x) = 0
@@ -153,8 +157,8 @@ function tests_for_paper(mesh_choice, problem_choice, smoother_choice, precondit
                 eigs_diag = extrema(abs.(eigvals(collect(M_diag\M))))
                 diagcond_list = [diagcond_list..., eigs_diag[2] / eigs_diag[1]]
             else
-                cond_list = [cond_list..., "See other"]
-                diagcond_list = [diagcond_list..., "See other"]
+                cond_list = [cond_list..., "-1"]
+                diagcond_list = [diagcond_list..., "-1"]
             end
 
             eigs_prec = extrema(abs.(eigvals(collect(M_prec))))
@@ -162,16 +166,25 @@ function tests_for_paper(mesh_choice, problem_choice, smoother_choice, precondit
         else
             # Problem matrices and preconditioning
             A,M = Mixed.assemble_lhs(meshes[i], k)
-            P_diag = spdiagm(vcat(diag(M), ones(Meshing.get_num_cells(meshes[i]))))
+            println("LHS assembly done")
+            # P_mass = spdiagm(vcat(diag(M), ones(Meshing.get_num_cells(meshes[i]))))
+            P_mass = spdiagm(vcat(diag(M), diag(Primal.assemble_mass_matrix(meshes[i], k))))
+            println("Constructing mass precond done")
             P = AuxPrecond.AuxPreconditioner_Darcy(smoother_choice,meshes[i]);
-            A_prec = AuxPrecond.apply_precond_to_mat(P, collect(A))
+            println("Constructing precond done")
+            # A_prec = AuxPrecond.apply_precond_to_mat(P, collect(A))
             
             b = Mixed.assemble_rhs(meshes[i], k, source_scalar, source_vector, p_bdry, M)
+            println("RHS assembly done")
             restart = size(b, 1)
+            # restart = 10
 
             _, log_unpr = gmres(A, b, restart=restart, log=true);
-            _, log_diag = gmres(P_diag\A, P_diag\b, restart=restart, log=true);
+            println("GMRES unprec done")
+            _, log_diag = gmres(P_mass\A, P_mass\b, restart=restart, log=true);
+            println("GMRES diag prec done")
             _, log_prec = gmres(A, b, Pl=P, restart=restart, log=true);
+            println("GMRES aux prec done")
 
             gmres_list = [gmres_list..., log_unpr.iters]
             diaggmres_list = [diaggmres_list..., log_diag.iters]
@@ -181,6 +194,7 @@ function tests_for_paper(mesh_choice, problem_choice, smoother_choice, precondit
             areas = meshes[i].cell_areas
             diams = meshes[i].cell_diams
             if mesh_choice == "aspectratio"
+                diam_list[1] = "Aspect ratios"
                 aspect_ratios = diams .^ 2 ./ areas
                 diam_list = [diam_list..., maximum(aspect_ratios)]
             else
@@ -192,15 +206,15 @@ function tests_for_paper(mesh_choice, problem_choice, smoother_choice, precondit
                 eigs = extrema(abs.(eigvals(collect(A))))
                 cond_list = [cond_list..., eigs[2] / eigs[1]]
 
-                eigs_diag = extrema(abs.(eigvals(collect(P_diag\A))))
+                eigs_diag = extrema(abs.(eigvals(collect(P_mass\A))))
                 diagcond_list = [diagcond_list..., eigs_diag[2] / eigs_diag[1]]
             else
-                cond_list = [cond_list..., "See other file"]
-                diagcond_list = [diagcond_list..., "See other file"]
+                cond_list = [cond_list..., "-1"]
+                diagcond_list = [diagcond_list..., "-1"]
             end
-            eigs_prec = extrema(abs.(eigvals(collect(A_prec))))
-            auxcond_list = [auxcond_list..., eigs_prec[2] / eigs_prec[1]]
-            # auxcond_list = [auxcond_list..., cond(collect(M_prec))]
+            # eigs_prec = extrema(abs.(eigvals(collect(A_prec))))
+            # auxcond_list = [auxcond_list..., eigs_prec[2] / eigs_prec[1]] # auxcond_list = [auxcond_list..., cond(collect(M_prec))]
+            auxcond_list = [auxcond_list..., "-1"]
         end
     end
 
@@ -220,18 +234,21 @@ end
 " SKIP REDO CONDITION NUMBER "
 # do_all_cond = true,false
 
-tests_for_paper("aspectratio", "divdiv", "energy", "additive", true)
-tests_for_paper("aspectratio", "divdiv", "face", "additive", false)
-tests_for_paper("aspectratio", "divdiv", "energy", "multiplicative", false)
-tests_for_paper("aspectratio", "divdiv", "face", "multiplicative", false)
+aspectratio_meshes = construct_meshes("aspectratio")
+refinement_meshes = construct_meshes("refinement")
 
-tests_for_paper("refinement", "divdiv", "energy", "additive", true)
-tests_for_paper("refinement", "divdiv", "face", "additive", false)
-tests_for_paper("refinement", "divdiv", "energy", "multiplicative", false)
-tests_for_paper("refinement", "divdiv", "face", "multiplicative", false)
+tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "energy", "additive", true)
+tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "face", "additive", false)
+tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "energy", "multiplicative", false)
+tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "face", "multiplicative", false)
 
-tests_for_paper("aspectratio", "darcy", "energy", "additive", true)
-tests_for_paper("aspectratio", "darcy", "face", "additive", false)
+tests_for_paper(refinement_meshes, "refinement", "divdiv", "energy", "additive", true)
+tests_for_paper(refinement_meshes, "refinement", "divdiv", "face", "additive", false)
+tests_for_paper(refinement_meshes, "refinement", "divdiv", "energy", "multiplicative", false)
+tests_for_paper(refinement_meshes, "refinement", "divdiv", "face", "multiplicative", false)
 
-tests_for_paper("refinement", "darcy", "energy", "additive", true)
-tests_for_paper("refinement", "darcy", "face", "additive", false)
+tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "energy", "additive", true)
+tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "face", "additive", false)
+
+tests_for_paper(refinement_meshes, "refinement", "darcy", "energy", "additive", false)
+tests_for_paper(refinement_meshes, "refinement", "darcy", "face", "additive", false)
