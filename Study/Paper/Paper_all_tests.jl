@@ -167,13 +167,12 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
         else
             # Problem matrices and preconditioning
             A,M = Mixed.assemble_lhs(meshes[i], k)
-            println("LHS assembly done")
+            # println("LHS assembly done")
             # P_mass = spdiagm(vcat(diag(M), ones(Meshing.get_num_cells(meshes[i]))))
             P_mass = spdiagm(vcat(diag(M), diag(Primal.assemble_mass_matrix(meshes[i], k))))
-            println("Constructing mass precond done")
+            # println("Constructing mass precond done")
             P = AuxPrecond.AuxPreconditioner_Darcy(smoother_choice,meshes[i]);
             println("Constructing precond done")
-            A_prec = AuxPrecond.apply_precond_to_mat(P, A)
             
             b = Mixed.assemble_rhs(meshes[i], k, source_scalar, source_vector, p_bdry, M)
             println("RHS assembly done")
@@ -181,9 +180,9 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
             # restart = 10
 
             _, log_unpr = gmres(A, b, restart=restart, log=true);
-            println("GMRES unprec done")
+            # println("GMRES unprec done")
             _, log_diag = gmres(P_mass\A, P_mass\b, restart=restart, log=true);
-            println("GMRES diag prec done")
+            # println("GMRES diag prec done")
             _, log_prec = gmres(A, b, Pl=P, restart=restart, log=true);
             println("GMRES aux prec done")
 
@@ -204,16 +203,14 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
 
             # Condition numbers
             if do_all_cond
-                # eigs = extrema(abs.(eigvals(collect(A))))
-                # cond_list = [cond_list..., eigs[2] / eigs[1]]
-                cond_list = [cond_list..., cond(A,1)]
-
-                diagcond_list = [diagcond_list..., cond(P_mass\A,1)]
+                cond_list = [cond_list..., cond(collect(A),2)]
+                diagcond_list = [diagcond_list..., cond(collect(P_mass)\A,2)]
             else
                 cond_list = [cond_list..., "-1"]
                 diagcond_list = [diagcond_list..., "-1"]
             end
-            auxcond_list = [auxcond_list..., cond(A_prec,1)]
+            A_prec = AuxPrecond.apply_precond_to_mat(P, A)
+            auxcond_list = [auxcond_list..., cond(collect(A_prec),2)]
             # auxcond_list = [auxcond_list..., "-1"]
         end
     end
@@ -222,16 +219,11 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
     export_result_to_file(mesh_choice, problem_choice, preconditioner_choice, smoother_choice, table)
 end
 
-## -------------- tests --------------#
-# " CHOOSE MESH / TEST " # mesh_choice = "aspectratio","refinement"
-# " CHOOSE PROBLEM " # problem_choice = "divdiv","darcy"
-# " CHOOSE SMOOTHER " # smoother_choice = "energy","face"
-# " CHOOSE PRECONDITIONER" # preconditioner_choice = "additive","multiplicative"
-# " SKIP REDO CONDITION NUMBER " # do_all_cond = true,false
-
+## -------------- meshes --------------#
 aspectratio_meshes = construct_meshes("aspectratio")
 refinement_meshes = construct_meshes("refinement")
 
+## -------------- plots and dofs --------------#
 # using Plots
 # plt1 = Meshing.draw_mesh(aspectratio_meshes[1])
 # savefig(plt1, "../../KTH/Projects/vem/local_tex/figure/aspratmesh_0.pdf")
@@ -248,6 +240,13 @@ refinement_meshes = construct_meshes("refinement")
 #     println("DOFS divdiv: ", size_tuple[1])
 #     println("DOFS darcy:  ", size_tuple[1]+size_tuple[2])
 # end
+
+## -------------- tests --------------#
+# " CHOOSE MESH / TEST " # mesh_choice = "aspectratio","refinement"
+# " CHOOSE PROBLEM " # problem_choice = "divdiv","darcy"
+# " CHOOSE SMOOTHER " # smoother_choice = "energy","face"
+# " CHOOSE PRECONDITIONER" # preconditioner_choice = "additive","multiplicative"
+# " SKIP REDO CONDITION NUMBER " # do_all_cond = true,false
 
 tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "energy", "additive", true)
 tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "face", "additive", false)
