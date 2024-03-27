@@ -1,4 +1,4 @@
-# cutVEM
+# VEM
 Virtual Element Method for cut static background meshes, interface modelled by the level set method
 
 Run the "study" files to see what is going on.
@@ -7,7 +7,7 @@ Run the "study" files to see what is going on.
 
 Add VEM to your path by creating a file "/root/.julia/config/startup.jl" that includes the line
 
-```push!(LOAD_PATH, "/root/your_path_to_CutVEM/src")```
+```push!(LOAD_PATH, "/root/your_path_to_VirtuE/src")```
 
 In the Julia terminal run pwd() to see how your particular root path looks. 
 
