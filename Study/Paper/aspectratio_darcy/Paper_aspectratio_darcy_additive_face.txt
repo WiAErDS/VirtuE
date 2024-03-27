@@ -1,8 +1,0 @@
-Diameters             κ(M)        κ(diagM/M)       κ(PM)                           GMRES M                     GMRES diagM/M                          GMRES PM
-       4.00E+00       3.26E+01       1.56E+01       7.96E+00         Converged after 116 iterations.         Converged after 107 iterations.         Converged after 136 iterations.
-       1.23E+02       1.06E+03       2.22E+01       7.08E+01         Converged after 148 iterations.         Converged after 133 iterations.         Converged after 191 iterations.
-       1.23E+03       1.06E+04       1.70E+02       2.24E+02         Converged after 150 iterations.         Converged after 180 iterations.         Converged after 200 iterations.
-       1.23E+04       1.06E+05       1.70E+03       7.08E+02         Converged after 151 iterations.         Converged after 163 iterations.         Converged after 205 iterations.
-       1.23E+05       1.06E+06       1.70E+04       2.24E+03         Converged after 151 iterations.         Converged after 131 iterations.         Converged after 210 iterations.
-       1.23E+06       1.06E+07       1.70E+05       2.07E+04         Converged after 151 iterations.         Converged after 124 iterations.     Not converged after 681 iterations.
-       1.23E+07       1.77E+11       1.70E+06       2.07E+05         Converged after 575 iterations.         Converged after 599 iterations.     Not converged after 681 iterations.

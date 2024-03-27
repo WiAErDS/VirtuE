@@ -7,17 +7,27 @@ using VirtuE
 
 ## -------------- (u,v)+(divu,divv) testing ground --------------#
     k = 0 # Polynomial degree
-    N = 10 # size of mesh
+    N = 8 # size of mesh
     # offset = 1/4N
     mesh = Meshing.create_rect_mesh(N);
 
-    for i = 1:N/2
-        r = i/(N+0.5)#+offset*(i==N/2)
-        levelset_0(x) = (x[1]-0.5)^10 + (x[2]-0.5)^10 - r^10
-        # r = i/(N+5.1)
-        # levelset_0(x) = abs(x[1]-0.5) + abs(x[2]-0.5) - r
+    for i = 1:N
+        # r = i/(N+0.5)#+offset*(i==N/2)
+        # levelset_0(x) = (x[1]-0.5)^10 + (x[2]-0.5)^10 - r^10
+        r = 0.125/2+(i-1)*0.125
+        levelset_0(x) = abs(x[1]-0.5) + abs(x[2]-0.5) - r
         mesh = Meshing.remesh(mesh, levelset_0);
     end
+    # nodes = mesh.node_coords
+    # step = 0
+    # for c in eachrow(nodes)
+    #     if step%2 != 0
+    #         r = 0.0125*5
+    #         levelset_0(x) = abs(x[1]-c[1]) + abs(x[2]-c[2]) - r
+    #         mesh = Meshing.remesh(mesh, levelset_0);
+    #     end
+    #     step += 1
+    # end
     plt = Meshing.draw_mesh(mesh)
 
     eps = 5 * 10.0^(-9)

@@ -130,9 +130,6 @@ end
 function assemble_divdiv_rhs(mesh, k, source_faces, M)
     @assert(k == 0, "Only implemented k=0")
 
-    # num_faces = Meshing.get_num_faces(mesh)
-    # b = zeros(num_faces)
-
     source_dofs = interpolate_fun(mesh, k, source_faces)
     b = M*source_dofs
 
@@ -148,9 +145,7 @@ function interpolate_fun(mesh, k, fun)
     num_faces = Meshing.get_num_faces(mesh)
     fun_dofs = zeros(num_faces)
     for face in 1:num_faces # Loops over boundary faces
-        # orient = -mesh.cell_faces[face, :].nzval[1] # Is there a nicer way to remove brackets around a singleton [x]?
         face_normal = Meshing.get_face_normals(mesh, face)
-        # fun_dofs[face] = norm(face_normal) * dot(fun(Meshing.get_face_centers(mesh, face)), face_normal)
         fun_dofs[face] = dot(fun(Meshing.get_face_centers(mesh, face)), face_normal)
     end
 

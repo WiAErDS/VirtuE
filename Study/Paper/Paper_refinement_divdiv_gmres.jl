@@ -7,7 +7,7 @@ using VirtuE
 
 ## -------------- (u,v)+(divu,divv) refinement testing grounds --------------#
     k = 0 # Polynomial degree
-    N = 10 # size of mesh
+    N = 4 # size of mesh
     # offset = 1/4N
     mesh = Meshing.create_rect_mesh(N);
 

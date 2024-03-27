@@ -532,8 +532,9 @@ function draw_mesh(mesh)
         vertices = get_rowvals(mesh.face_nodes, k)
         # Plots.plot!(plt, mesh.node_coords[vertices, 1], mesh.node_coords[vertices, 2], linecolor="black") 
         Plots.plot!(plt, mesh.node_coords[vertices, 1], mesh.node_coords[vertices, 2], linecolor="black", 
-            xticks = 0:0.1:1, yticks = 0:0.1:1, xlims = (-0.1,1.1), ylims = (-0.1,1.1))
+            xticks = 0:0.1:1, yticks = 0:0.1:1, xlims = (-0.1,1.1), ylims = (-0.1,1.1), axis=([], false))
     end
+    plt = Plots.scatter!(plt, mesh.node_coords[:, 1], mesh.node_coords[:, 2], legend=false, aspect_ratio=:equal, markersize=3, color="blue")
     display(plt)
     return plt
 end

@@ -1,8 +1,6 @@
-Diameters           κ(M)                κ(diagM/M)          κ(PM)               GMRES M             GMRES diagM/M       GMRES PM            
-4.00E+00            See other file      See other file      -1                  80                  74                  67                  
-1.23E+02            See other file      See other file      -1                  107                 97                  113                 
-1.23E+03            See other file      See other file      -1                  103                 115                 107                 
-1.23E+04            See other file      See other file      -1                  104                 90                  107                 
-1.23E+05            See other file      See other file      -1                  103                 77                  107                 
-1.23E+06            See other file      See other file      -1                  103                 92                  107                 
-1.23E+07            See other file      See other file      -1                  120                 546                 107                 
+Aspect ratios       κ(M)                κ(diagM/M)          κ(PM)               GMRES M             GMRES diagM/M       GMRES PM            
+4.00E+00            -1                  -1                  2.19E+05            72                  58                  59                  
+7.94E+00            -1                  -1                  1.91E+06            87                  168                 77                  
+6.27E+02            -1                  -1                  1.77E+08            90                  231                 93                  
+6.25E+04            -1                  -1                  1.77E+10            89                  180                 92                  
+6.25E+06            -1                  -1                  1.77E+12            95                  415                 91                  

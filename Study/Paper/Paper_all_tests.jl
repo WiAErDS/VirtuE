@@ -48,25 +48,25 @@ end
 function construct_meshes(mesh_choice)
     meshes = []
     if mesh_choice == "aspectratio"
-        N = 10 # size of mesh
+        N = 8 # size of mesh
         # offset = 1/4N
         mesh = Meshing.create_rect_mesh(N);
-        for i = 1:N/2
-            r = i/(N+0.5)#+offset*(i==N/2)
-            # println(r)
-            levelset_0(x) = (x[1]-0.5)^10 + (x[2]-0.5)^10 - r^10
+        for i = 1:N
+            r = 1/(2N)+(i-1)*1/N
+            levelset_0(x) = abs(x[1]-0.5) + abs(x[2]-0.5) - r
             mesh = Meshing.remesh(mesh, levelset_0);
         end
         # plt = Meshing.draw_mesh(mesh)
         meshes = [mesh]
-        for i in 4:9
-            eps = 5 * 10.0^(-i)
+        for i in [2,4,6,8]
+            eps = 10.0^(-i)
             levelset(x) = x[2] - (0.5 + eps)
             meshes = [meshes..., Meshing.remesh(mesh, levelset)]
             # Meshing.draw_line_on_mesh(plt, mesh, levelset)
         end
     else 
         for N in [4,8,16,32]
+        # for N in [4,8,16,32,64]
             mesh = Meshing.create_rect_mesh(N);
 
             h = 1/N #maximum(mesh.cell_diams)
@@ -78,6 +78,7 @@ function construct_meshes(mesh_choice)
                 mesh = Meshing.remesh(mesh, levelset_0);
             end
             meshes = [meshes..., mesh]
+            println("Mesh", N, " done")
         end
     end
     return meshes
@@ -123,10 +124,10 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
             M_prec = []
             if preconditioner_choice == "additive"
                 P = AuxPrecond.AuxPreconditioner(smoother_choice, meshes[i]);
-                M_prec = AuxPrecond.apply_precond_to_mat(P, collect(M))
+                M_prec = AuxPrecond.apply_precond_to_mat(P, M)
             else
                 P = AuxPrecondMultiplicative.AuxPreconditionerMultiplicative(smoother_choice, meshes[i]);
-                M_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, collect(M))
+                M_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, M)
             end
             b = Mixed.assemble_divdiv_rhs(meshes[i], k, source_vector, MassMat)
             restart = size(b, 1)
@@ -172,7 +173,7 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
             println("Constructing mass precond done")
             P = AuxPrecond.AuxPreconditioner_Darcy(smoother_choice,meshes[i]);
             println("Constructing precond done")
-            # A_prec = AuxPrecond.apply_precond_to_mat(P, collect(A))
+            A_prec = AuxPrecond.apply_precond_to_mat(P, A)
             
             b = Mixed.assemble_rhs(meshes[i], k, source_scalar, source_vector, p_bdry, M)
             println("RHS assembly done")
@@ -203,18 +204,17 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
 
             # Condition numbers
             if do_all_cond
-                eigs = extrema(abs.(eigvals(collect(A))))
-                cond_list = [cond_list..., eigs[2] / eigs[1]]
+                # eigs = extrema(abs.(eigvals(collect(A))))
+                # cond_list = [cond_list..., eigs[2] / eigs[1]]
+                cond_list = [cond_list..., cond(A,1)]
 
-                eigs_diag = extrema(abs.(eigvals(collect(P_mass\A))))
-                diagcond_list = [diagcond_list..., eigs_diag[2] / eigs_diag[1]]
+                diagcond_list = [diagcond_list..., cond(P_mass\A,1)]
             else
                 cond_list = [cond_list..., "-1"]
                 diagcond_list = [diagcond_list..., "-1"]
             end
-            # eigs_prec = extrema(abs.(eigvals(collect(A_prec))))
-            # auxcond_list = [auxcond_list..., eigs_prec[2] / eigs_prec[1]] # auxcond_list = [auxcond_list..., cond(collect(M_prec))]
-            auxcond_list = [auxcond_list..., "-1"]
+            auxcond_list = [auxcond_list..., cond(A_prec,1)]
+            # auxcond_list = [auxcond_list..., "-1"]
         end
     end
 
@@ -223,19 +223,31 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
 end
 
 ## -------------- tests --------------#
-" CHOOSE MESH / TEST "
-# mesh_choice = "aspectratio","refinement"
-" CHOOSE PROBLEM "
-# problem_choice = "divdiv","darcy"
-" CHOOSE SMOOTHER "
-# smoother_choice = "energy","face"
-" CHOOSE PRECONDITIONER"
-# preconditioner_choice = "additive","multiplicative"
-" SKIP REDO CONDITION NUMBER "
-# do_all_cond = true,false
+# " CHOOSE MESH / TEST " # mesh_choice = "aspectratio","refinement"
+# " CHOOSE PROBLEM " # problem_choice = "divdiv","darcy"
+# " CHOOSE SMOOTHER " # smoother_choice = "energy","face"
+# " CHOOSE PRECONDITIONER" # preconditioner_choice = "additive","multiplicative"
+# " SKIP REDO CONDITION NUMBER " # do_all_cond = true,false
 
 aspectratio_meshes = construct_meshes("aspectratio")
 refinement_meshes = construct_meshes("refinement")
+
+# using Plots
+# plt1 = Meshing.draw_mesh(aspectratio_meshes[1])
+# savefig(plt1, "../../KTH/Projects/vem/local_tex/figure/aspratmesh_0.pdf")
+# Meshing.draw_line_on_mesh(plt1, aspectratio_meshes[1], x -> x[2] - (0.5 + 10^(-2)))
+# savefig(plt1, "../../KTH/Projects/vem/local_tex/figure/aspratmesh_eps.pdf")
+
+# plt4 = Meshing.draw_mesh(refinement_meshes[1])
+# savefig(plt4, "../../KTH/Projects/vem/local_tex/figure/diamondmesh_4.pdf")
+# plt8 = Meshing.draw_mesh(refinement_meshes[2])
+# savefig(plt8, "../../KTH/Projects/vem/local_tex/figure/diamondmesh_8.pdf")
+
+# for i=eachindex(refinement_meshes)
+#     size_tuple = size(refinement_meshes[i].cell_faces)
+#     println("DOFS divdiv: ", size_tuple[1])
+#     println("DOFS darcy:  ", size_tuple[1]+size_tuple[2])
+# end
 
 tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "energy", "additive", true)
 tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "face", "additive", false)
@@ -250,5 +262,5 @@ tests_for_paper(refinement_meshes, "refinement", "divdiv", "face", "multiplicati
 tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "energy", "additive", true)
 tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "face", "additive", false)
 
-tests_for_paper(refinement_meshes, "refinement", "darcy", "energy", "additive", false)
+tests_for_paper(refinement_meshes, "refinement", "darcy", "energy", "additive", true)
 tests_for_paper(refinement_meshes, "refinement", "darcy", "face", "additive", false)
