@@ -58,13 +58,14 @@ function construct_meshes(mesh_choice)
         end
         # plt = Meshing.draw_mesh(mesh)
         meshes = [mesh]
-        for i in [2,4,6,8]
+        for i in [2,4,6,8,10]
             eps = 10.0^(-i)
             levelset(x) = x[2] - (0.5 + eps)
             meshes = [meshes..., Meshing.remesh(mesh, levelset)]
             # Meshing.draw_line_on_mesh(plt, mesh, levelset)
         end
     else 
+        # for N in [4,8]
         for N in [4,8,16,32]
         # for N in [4,8,16,32,64]
             mesh = Meshing.create_rect_mesh(N);
@@ -86,10 +87,6 @@ end
 
 ## -------------- test function --------------#
 function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, preconditioner_choice, do_all_cond=true)
-    if problem_choice == "darcy" # only additive fo Darcy
-        preconditioner_choice = "additive"
-    end
-
     k = 0 # Polynomial degree
 
     # RHS data (from Study/Mixed_convg.jl)
@@ -113,7 +110,8 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
     gmres_list = ["GMRES M"]
     diaggmres_list = ["GMRES diagM/M"]
     auxgmres_list = ["GMRES PM"]
-    for i in eachindex(meshes)
+    # for i in eachindex(meshes)
+    for i in 1:3
         println("Mesh ", i)
         if problem_choice == "divdiv"
             # Problem matrices and preconditioning
@@ -167,18 +165,20 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
         else
             # Problem matrices and preconditioning
             A,M = Mixed.assemble_lhs(meshes[i], k)
-            # println("LHS assembly done")
             # P_mass = spdiagm(vcat(diag(M), ones(Meshing.get_num_cells(meshes[i]))))
             P_mass = spdiagm(vcat(diag(M), diag(Primal.assemble_mass_matrix(meshes[i], k))))
-            # println("Constructing mass precond done")
-            P = AuxPrecond.AuxPreconditioner_Darcy(smoother_choice,meshes[i]);
+            if preconditioner_choice == "additive"
+                P = AuxPrecond.AuxPreconditioner_Darcy(smoother_choice,meshes[i]);
+            else
+                P = AuxPrecondMultiplicative.AuxPreconditionerMult_Darcy(smoother_choice,meshes[i]);
+            end
             println("Constructing precond done")
             
             b = Mixed.assemble_rhs(meshes[i], k, source_scalar, source_vector, p_bdry, M)
             println("RHS assembly done")
+
             restart = size(b, 1)
             # restart = 10
-
             _, log_unpr = gmres(A, b, restart=restart, log=true);
             # println("GMRES unprec done")
             _, log_diag = gmres(P_mass\A, P_mass\b, restart=restart, log=true);
@@ -202,21 +202,26 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
             end
 
             # Condition numbers
-            if do_all_cond
+            if do_all_cond && i<4
                 cond_list = [cond_list..., cond(collect(A),2)]
-                diagcond_list = [diagcond_list..., cond(collect(P_mass)\A,2)]
+                diagcond_list = [diagcond_list..., cond(collect(P_mass\A),2)]
+                if preconditioner_choice == "additive"
+                    A_prec = AuxPrecond.apply_precond_to_mat(P, A)
+                else
+                    A_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, A)
+                end
+                auxcond_list = [auxcond_list..., cond(collect(A_prec),2)]
             else
                 cond_list = [cond_list..., "-1"]
                 diagcond_list = [diagcond_list..., "-1"]
+                auxcond_list = [auxcond_list..., "-1"]
             end
-            A_prec = AuxPrecond.apply_precond_to_mat(P, A)
-            auxcond_list = [auxcond_list..., cond(collect(A_prec),2)]
-            # auxcond_list = [auxcond_list..., "-1"]
         end
     end
 
     table = [diam_list cond_list diagcond_list auxcond_list gmres_list diaggmres_list auxgmres_list];
-    export_result_to_file(mesh_choice, problem_choice, preconditioner_choice, smoother_choice, table)
+    print(table)
+    # export_result_to_file(mesh_choice, problem_choice, preconditioner_choice, smoother_choice, table)
 end
 
 ## -------------- meshes --------------#
@@ -261,5 +266,7 @@ tests_for_paper(refinement_meshes, "refinement", "divdiv", "face", "multiplicati
 tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "energy", "additive", true)
 tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "face", "additive", false)
 
-tests_for_paper(refinement_meshes, "refinement", "darcy", "energy", "additive", true)
+tests_for_paper(refinement_meshes, "refinement", "darcy", "energy", "additive", false)
 tests_for_paper(refinement_meshes, "refinement", "darcy", "face", "additive", false)
+tests_for_paper(refinement_meshes, "refinement", "darcy", "energy", "multiplicative", true)
+tests_for_paper(refinement_meshes, "refinement", "darcy", "face", "multiplicative", false)

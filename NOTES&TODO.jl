@@ -1,3 +1,8 @@
+############################# NOTES 2024 #########################
+# From terminal (for instance remotely) run:
+# julia --threads 4 Paper_all_tests.jl
+
+
 
 ############################## TODO #########################
 ## LSM:

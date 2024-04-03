@@ -111,16 +111,59 @@ function assemble_div_projector_matrix(mesh)
     return [n_x * f_n n_y * f_n]
 end
 
-"""
-Applies the preconditioner P to dense matrix Mat that scales as divdiv
-"""
-function apply_precond_to_mat(P::AuxPreconditionerMultiplicative, Mat)
-    M_prec = (collect(P \ col) for col in eachcol(Mat))
-    return hcat(M_prec...)
+# """
+# Applies the preconditioner P to dense matrix Mat that scales as divdiv
+# """
+# function apply_precond_to_mat(P::AuxPreconditionerMultiplicative, Mat)
+#     M_prec = (collect(P \ col) for col in eachcol(Mat))
+#     return hcat(M_prec...)
+# end
+
+# LinearAlgebra.ldiv!(D::AuxPreconditionerMultiplicative, v::AbstractVector) = v .= D \ v
+# LinearAlgebra.ldiv!(y, D::AuxPreconditionerMultiplicative, v::AbstractVector) = y .= D \ v
+
+
+struct AuxPreconditionerMult_Darcy
+    P::AuxPreconditionerMultiplicative
+    M_0::SparseMatrixCSC
 end
 
-LinearAlgebra.ldiv!(D::AuxPreconditionerMultiplicative, v::AbstractVector) = v .= D \ v
-LinearAlgebra.ldiv!(y, D::AuxPreconditionerMultiplicative, v::AbstractVector) = y .= D \ v
+"""
+Constructor
+"""
+function AuxPreconditionerMult_Darcy(smoother_choice, mesh::Meshing.Mesh, k=0, μ_inv=x -> 1)
+    P = AuxPreconditionerMultiplicative(smoother_choice, mesh, k, μ_inv)
+    M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
 
+    return AuxPreconditionerMult_Darcy(P, M_0)
+end
+
+"""
+Apply auxiliary space preconditioner P to a vector in a mixed Darcy system
+"""
+function (\)(D::AuxPreconditionerMult_Darcy, v::Union{AbstractVector,SparseVector})
+    num_cells = size(D.M_0)[1]
+
+    v_prec = zeros(length(v))
+    v_prec[1:end-num_cells] = D.P \ v[1:end-num_cells]
+    v_prec[end-num_cells+1:end] = D.M_0 \ v[end-num_cells+1:end]
+
+    return v_prec
+end
+
+LinearAlgebra.ldiv!(D::Union{AuxPreconditionerMultiplicative,AuxPreconditionerMult_Darcy}, v::AbstractVector) = v .= D \ v
+LinearAlgebra.ldiv!(y, D::Union{AuxPreconditionerMultiplicative,AuxPreconditionerMult_Darcy}, v::AbstractVector) = y .= D \ v
+
+"""
+Applies the preconditioner P to matrix Mat that scales as divdiv, or a mixed Darcy system
+"""
+function apply_precond_to_mat(P::Union{AuxPreconditionerMultiplicative,AuxPreconditionerMult_Darcy}, Mat)
+    mat_size = size(Mat)
+    M_prec = spzeros(mat_size)
+    for i = 1:mat_size[2]
+        M_prec[:,i] = P \ Mat[:,i]
+    end
+    return M_prec
+end
 
 end

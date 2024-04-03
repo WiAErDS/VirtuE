@@ -127,7 +127,10 @@ Constructor
 """
 function AuxPreconditioner_Darcy(smoother_choice, mesh::Meshing.Mesh, k=0, μ_inv=x -> 1)
     P = AuxPreconditioner(smoother_choice, mesh, k, μ_inv)
-    M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)       # mass matrix for Darcy system
+    M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
+    M_0 = sqrt.(M_0)
+    # M_0 = spdiagm(1 ./ diag(M_0))
+    # M_0 = spdiagm(ones(Meshing.get_num_cells(mesh)))
 
     return AuxPreconditioner_Darcy(P, M_0)
 end
@@ -152,53 +155,53 @@ LinearAlgebra.ldiv!(y, D::Union{AuxPreconditioner,AuxPreconditioner_Darcy}, v::A
 Applies the preconditioner P to matrix Mat that scales as divdiv, or a mixed Darcy system
 """
 # function apply_precond_to_mat(P::Union{AuxPreconditioner,AuxPreconditioner_Darcy}, Mat)
-#     mat_size = size(Mat)
-#     M_prec = spzeros(mat_size)
-
-#     for i = 1:mat_size[2]
-#         M_prec[:,i] = P \ Mat[:,i]
-#         if i%floor(Int,mat_size[2]/6)==0
-#             print(" ; iter = $i of num_cols = ", mat_size[2])    
-#         end
-#     end
-#     return M_prec
+#     M_prec = (collect(P \ col) for col in eachcol(Mat))
+#     return hcat(M_prec...)
 # end
 function apply_precond_to_mat(P::Union{AuxPreconditioner,AuxPreconditioner_Darcy}, Mat)
     mat_size = size(Mat)
-    num_threads = Threads.nthreads()
-    num_cols = mat_size[2]
-    
-    # Calculate the range of columns each thread will handle
-    # LinRange is used to ensure all columns are covered even when num_cols is not divisible by num_threads
-    column_ranges = floor.(Int, LinRange(1, num_cols, num_threads + 1))
-    
-    # Initialize a container for the thread-local matrices
-    local_mats = Vector{SparseMatrixCSC{Float64,Int64}}(undef, num_threads)
-
-    Threads.@threads for tid in 1:num_threads
-        start_col = column_ranges[tid]
-        end_col = column_ranges[tid + 1] - 1
-        # Adjust the end_col for the last thread to ensure it includes the last column if num_cols isn't evenly divisible
-        if tid == num_threads
-            end_col = num_cols
-        end
-        # Pre-allocate the size for each thread's local matrix
-        local_mats[tid] = spzeros(mat_size[1], end_col - start_col + 1)
-
-        for i = start_col:end_col
-            # Process each column and place it directly in the correct position within the thread's local matrix
-            local_mats[tid][:, i - start_col + 1] = P \ Mat[:,i]
-            # if i % floor(Int, num_cols / 6) == 0 || i == end_col # Print progress at specified intervals or at the end of each thread's range
-            #     println(" ; iter = $i of num_cols = $num_cols on thread = $tid")
-            # end
-        end
-        println("thread $tid done!")
+    M_prec = spzeros(mat_size)
+    for i = 1:mat_size[2]
+        M_prec[:,i] = P \ Mat[:,i]
     end
-
-    # Concatenate all thread-local matrices into a single matrix
-    M_prec = hcat(local_mats...)
     return M_prec
 end
+# function apply_precond_to_mat(P::Union{AuxPreconditioner,AuxPreconditioner_Darcy}, Mat)
+#     mat_size = size(Mat)
+#     num_threads = Threads.nthreads()
+#     num_cols = mat_size[2]
+    
+#     # Calculate the range of columns each thread will handle
+#     # LinRange is used to ensure all columns are covered even when num_cols is not divisible by num_threads
+#     column_ranges = floor.(Int, LinRange(1, num_cols, num_threads + 1))
+    
+#     # Initialize a container for the thread-local matrices
+#     local_mats = Vector{SparseMatrixCSC{Float64,Int64}}(undef, num_threads)
+
+#     Threads.@threads for tid in 1:num_threads
+#         start_col = column_ranges[tid]
+#         end_col = column_ranges[tid + 1] - 1
+#         # Adjust the end_col for the last thread to ensure it includes the last column if num_cols isn't evenly divisible
+#         if tid == num_threads
+#             end_col = num_cols
+#         end
+#         # Pre-allocate the size for each thread's local matrix
+#         local_mats[tid] = spzeros(mat_size[1], end_col - start_col + 1)
+
+#         for i = start_col:end_col
+#             # Process each column and place it directly in the correct position within the thread's local matrix
+#             local_mats[tid][:, i - start_col + 1] = P \ Mat[:,i]
+#             # if i % floor(Int, num_cols / 6) == 0 || i == end_col # Print progress at specified intervals or at the end of each thread's range
+#             #     println(" ; iter = $i of num_cols = $num_cols on thread = $tid")
+#             # end
+#         end
+#         println("thread $tid done!")
+#     end
+
+#     # Concatenate all thread-local matrices into a single matrix
+#     M_prec = hcat(local_mats...)
+#     return M_prec
+# end
 
 
 
