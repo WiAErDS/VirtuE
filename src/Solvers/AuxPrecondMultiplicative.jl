@@ -11,6 +11,7 @@ struct AuxPreconditionerMultiplicative
     S::SparseMatrixCSC
     E_p::SparseMatrixCSC
     E_div::SparseMatrixCSC
+    M::SparseMatrixCSC
     Π::SparseMatrixCSC
     C::SparseMatrixCSC
 end
@@ -18,14 +19,18 @@ end
 """
 Constructor s
 """
-function AuxPreconditionerMultiplicative(smoother_choice, mesh, k=0, μ_inv=x -> 1)
+function AuxPreconditionerMultiplicative(smoother_choice, mesh, k=0, μ_inv=x -> 1, problem_choice="divdiv")
     E_p = assemble_primal_energy_matrix(mesh, k + 1, μ_inv) # (u,v) + (grad u, grad v)
-    E_div = assemble_mixed_energy_matrix(mesh, k, μ_inv)    # (u,v) + (div u, div v)
+    E_div,M = assemble_mixed_energy_matrix(mesh, k, μ_inv)    # (u,v) + (div u, div v)
     S = assemble_smoother(smoother_choice, mesh, E_div)
     Π = assemble_div_projector_matrix(mesh)                 # Π_h
     C = curl(mesh)                                          # curl
 
-    return AuxPreconditionerMultiplicative(S, E_p, E_div, Π, C)
+    if problem_choice == "divdiv"
+        return AuxPreconditionerMultiplicative(S, E_p, E_div, Π, C)
+    else
+        return AuxPreconditionerMultiplicative(S, E_p, M, Π, C)
+    end
 end
 
 """
@@ -79,7 +84,7 @@ end
 function assemble_mixed_energy_matrix(mesh, k, μ_inv=x -> 1)
     M = Mixed.assemble_mass_matrix(mesh, k, μ_inv)
     A_div = Mixed.assemble_divdiv_matrix(mesh, k, μ_inv)
-    return A_div + M
+    return A_div + M, M
 end
 
 
@@ -111,18 +116,6 @@ function assemble_div_projector_matrix(mesh)
     return [n_x * f_n n_y * f_n]
 end
 
-# """
-# Applies the preconditioner P to dense matrix Mat that scales as divdiv
-# """
-# function apply_precond_to_mat(P::AuxPreconditionerMultiplicative, Mat)
-#     M_prec = (collect(P \ col) for col in eachcol(Mat))
-#     return hcat(M_prec...)
-# end
-
-# LinearAlgebra.ldiv!(D::AuxPreconditionerMultiplicative, v::AbstractVector) = v .= D \ v
-# LinearAlgebra.ldiv!(y, D::AuxPreconditionerMultiplicative, v::AbstractVector) = y .= D \ v
-
-
 struct AuxPreconditionerMult_Darcy
     P::AuxPreconditionerMultiplicative
     M_0::SparseMatrixCSC
@@ -132,7 +125,7 @@ end
 Constructor
 """
 function AuxPreconditionerMult_Darcy(smoother_choice, mesh::Meshing.Mesh, k=0, μ_inv=x -> 1)
-    P = AuxPreconditionerMultiplicative(smoother_choice, mesh, k, μ_inv)
+    P = AuxPreconditionerMultiplicative(smoother_choice, mesh, k, μ_inv, "darcy")
     M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
 
     return AuxPreconditionerMult_Darcy(P, M_0)

@@ -45,8 +45,8 @@ function element_projection_matrices(mesh, cell, k)
     return Proj, PreProj, G
 end
 
-function element_mass_matrix(Proj, PreProj, G)
-    # TODO: VEM param before (I-Proj)
+function element_mass_matrix(Proj, PreProj, G, area)
+    # Mass matrix scales as 1= h^2 (1/h)^2 = area* bfun^2
     return PreProj' * G * PreProj + (I - Proj)' * (I - Proj)
 end
 
@@ -67,7 +67,8 @@ function assemble_mass_matrix(mesh, k, μ_inv=x -> 1)
             G = G[2:end, 2:end]
         end
 
-        K_el = element_mass_matrix(Proj, PreProj, G)
+        area = mesh.cell_areas[cell]
+        K_el = element_mass_matrix(Proj, PreProj, G, area)
 
         append!(I, repeat(faces, length(faces)))
         append!(J, repeat(faces, inner=length(faces)))
@@ -95,7 +96,7 @@ function assemble_lhs(mesh, k, μ_inv=x -> 1)
 
     zero_mat = zeros(size(B, 1), size(B, 1))
 
-    return [M -B'; B zero_mat], M
+    return [M -B'; -B zero_mat], M
 end
 
 """

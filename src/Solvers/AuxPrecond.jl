@@ -128,7 +128,7 @@ Constructor
 function AuxPreconditioner_Darcy(smoother_choice, mesh::Meshing.Mesh, k=0, μ_inv=x -> 1)
     P = AuxPreconditioner(smoother_choice, mesh, k, μ_inv)
     M_0 = Primal.assemble_mass_matrix(mesh, k, μ_inv)
-    M_0 = sqrt.(M_0)
+    # M_0 = sqrt.(M_0)
     # M_0 = spdiagm(1 ./ diag(M_0))
     # M_0 = spdiagm(ones(Meshing.get_num_cells(mesh)))
 

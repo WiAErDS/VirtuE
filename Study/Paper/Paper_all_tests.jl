@@ -58,14 +58,14 @@ function construct_meshes(mesh_choice)
         end
         # plt = Meshing.draw_mesh(mesh)
         meshes = [mesh]
-        for i in [2,4,6,8,10]
+        for i in [2,4,6,8]
             eps = 10.0^(-i)
             levelset(x) = x[2] - (0.5 + eps)
             meshes = [meshes..., Meshing.remesh(mesh, levelset)]
             # Meshing.draw_line_on_mesh(plt, mesh, levelset)
         end
     else 
-        # for N in [4,8]
+        # for N in [4,8,16]
         for N in [4,8,16,32]
         # for N in [4,8,16,32,64]
             mesh = Meshing.create_rect_mesh(N);
@@ -96,7 +96,7 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
     u_sol(x) = 2*[cos(x[1])*sinh(x[2]), sin(x[1])*cosh(x[2])]
     p_bdry(x) = p_sol(x)
     if mesh_choice == "refinement"
-        source_scalar(x) = 40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
+        source_scalar(x) = -40 * π^2 * sin(2 * π * x[1]) * sin(4 * π * x[2])
         source_vector(x) = -[2π * cos(2π * x[1]) * sin(4π * x[2]), 4π * cos(4π * x[2]) * sin(2π * x[1])]
         p_bdry(x) = 0
         u_sol(x) = -[4π * cos(2π * x[1]) * sin(4π * x[2]), 8π * cos(4π * x[2]) * sin(2π * x[1])]
@@ -110,8 +110,8 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
     gmres_list = ["GMRES M"]
     diaggmres_list = ["GMRES diagM/M"]
     auxgmres_list = ["GMRES PM"]
-    # for i in eachindex(meshes)
-    for i in 1:3
+    for i in eachindex(meshes)
+    # for i = 1:3
         println("Mesh ", i)
         if problem_choice == "divdiv"
             # Problem matrices and preconditioning
@@ -133,6 +133,11 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
             _, log_unpr = gmres(M, b, restart=restart, log=true);
             _, log_diag = gmres(M_diag\M, M_diag\b, restart=restart, log=true);
             _, log_prec = gmres(M, b, Pl=P, restart=restart, log=true);
+            println("GMRES aux prec done")
+            # _, log_unpr = cg(M, b, log=true);
+            # _, log_diag = cg(M_diag\M, M_diag\b, log=true);
+            # _, log_prec = cg(M, b, Pl=P, log=true);
+            # println("PCG aux prec done")
 
             gmres_list = [gmres_list..., log_unpr.iters]
             diaggmres_list = [diaggmres_list..., log_diag.iters]
@@ -180,11 +185,13 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
             restart = size(b, 1)
             # restart = 10
             _, log_unpr = gmres(A, b, restart=restart, log=true);
-            # println("GMRES unprec done")
             _, log_diag = gmres(P_mass\A, P_mass\b, restart=restart, log=true);
-            # println("GMRES diag prec done")
             _, log_prec = gmres(A, b, Pl=P, restart=restart, log=true);
             println("GMRES aux prec done")
+            # _, log_unpr = cg(A, b, log=true);
+            # _, log_diag = cg(P_mass\A, P_mass\b, log=true);
+            # _, log_prec = cg(A, b, Pl=P, log=true);
+            # println("PCG aux prec done")
 
             gmres_list = [gmres_list..., log_unpr.iters]
             diaggmres_list = [diaggmres_list..., log_diag.iters]
@@ -200,28 +207,35 @@ function tests_for_paper(meshes, mesh_choice, problem_choice, smoother_choice, p
             else
                 diam_list = [diam_list..., maximum(diams)]
             end
-
             # Condition numbers
-            if do_all_cond && i<4
-                cond_list = [cond_list..., cond(collect(A),2)]
-                diagcond_list = [diagcond_list..., cond(collect(P_mass\A),2)]
+            if (do_all_cond && mesh_choice=="aspectratio") || (do_all_cond && mesh_choice=="refinement" && i < 4)
+                # cond_list = [cond_list..., cond(collect(A),2)]
+                # diagcond_list = [diagcond_list..., cond(collect(P_mass\A),2)]
+                eigs = extrema(abs.(eigvals(collect(A))))
+                cond_list = [cond_list..., eigs[2] / eigs[1]]
+                eigs_diag = extrema(abs.(eigvals(collect(P_mass\A))))
+                diagcond_list = [diagcond_list..., eigs_diag[2] / eigs_diag[1]]
                 if preconditioner_choice == "additive"
                     A_prec = AuxPrecond.apply_precond_to_mat(P, A)
                 else
                     A_prec = AuxPrecondMultiplicative.apply_precond_to_mat(P, A)
                 end
-                auxcond_list = [auxcond_list..., cond(collect(A_prec),2)]
+                # auxcond_list = [auxcond_list..., cond(collect(A_prec),2)]
+                eigs_prec = extrema(abs.(eigvals(collect(A_prec))))
+                auxcond_list = [auxcond_list..., eigs_prec[2] / eigs_prec[1]]
             else
                 cond_list = [cond_list..., "-1"]
                 diagcond_list = [diagcond_list..., "-1"]
                 auxcond_list = [auxcond_list..., "-1"]
             end
+            # _,s,_ = svd(collect(AuxPrecond.apply_precond_to_mat(P, A)))
+            # histogram(s, bins=100, title="Singular values of preconditioned A", label="Mesh $i", xlabel="s", ylabel="Frequency")
         end
     end
 
+    [diam_list cond_list diagcond_list auxcond_list gmres_list diaggmres_list auxgmres_list]
     table = [diam_list cond_list diagcond_list auxcond_list gmres_list diaggmres_list auxgmres_list];
-    print(table)
-    # export_result_to_file(mesh_choice, problem_choice, preconditioner_choice, smoother_choice, table)
+    export_result_to_file(mesh_choice, problem_choice, preconditioner_choice, smoother_choice, table)
 end
 
 ## -------------- meshes --------------#
@@ -253,20 +267,22 @@ refinement_meshes = construct_meshes("refinement")
 # " CHOOSE PRECONDITIONER" # preconditioner_choice = "additive","multiplicative"
 # " SKIP REDO CONDITION NUMBER " # do_all_cond = true,false
 
-tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "energy", "additive", true)
+tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "energy", "additive", true) # true
 tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "face", "additive", false)
-tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "energy", "multiplicative", false)
+tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "energy", "multiplicative", true)
 tests_for_paper(aspectratio_meshes, "aspectratio", "divdiv", "face", "multiplicative", false)
 
-tests_for_paper(refinement_meshes, "refinement", "divdiv", "energy", "additive", true)
+tests_for_paper(refinement_meshes, "refinement", "divdiv", "energy", "additive", false) # true
 tests_for_paper(refinement_meshes, "refinement", "divdiv", "face", "additive", false)
-tests_for_paper(refinement_meshes, "refinement", "divdiv", "energy", "multiplicative", false)
+tests_for_paper(refinement_meshes, "refinement", "divdiv", "energy", "multiplicative", true)
 tests_for_paper(refinement_meshes, "refinement", "divdiv", "face", "multiplicative", false)
 
-tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "energy", "additive", true)
+tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "energy", "additive", true) # true
 tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "face", "additive", false)
+tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "energy", "multiplicative", true)
+tests_for_paper(aspectratio_meshes, "aspectratio", "darcy", "face", "multiplicative", false)
 
-tests_for_paper(refinement_meshes, "refinement", "darcy", "energy", "additive", false)
+tests_for_paper(refinement_meshes, "refinement", "darcy", "energy", "additive", true) # true
 tests_for_paper(refinement_meshes, "refinement", "darcy", "face", "additive", false)
 tests_for_paper(refinement_meshes, "refinement", "darcy", "energy", "multiplicative", true)
 tests_for_paper(refinement_meshes, "refinement", "darcy", "face", "multiplicative", false)

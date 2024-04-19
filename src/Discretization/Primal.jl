@@ -166,7 +166,7 @@ end
 
 function element_mass_matrix(Proj, PreProj, H, area)
     # Π^0 = Proj, L2 proj to vem basis
-
+    # Mass matrix scales as h^2 = h^2 (1)^2 = area* bfun^2
     return PreProj' * H * PreProj + area * (I - Proj)' * (I - Proj)
 end
 
