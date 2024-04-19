@@ -1,7 +1,7 @@
 # VEM
 Virtual Element Method for cut static background meshes, interface modelled by the level set method
 
-Run the "study" files to see what is going on.
+Play around with the files in the "Study" folder to see what is going on.
 
 # Installation
 
@@ -10,6 +10,10 @@ Add VEM to your path by creating a file "/root/.julia/config/startup.jl" that in
 ```push!(LOAD_PATH, "/root/your_path_to_VirtuE/src")```
 
 In the Julia terminal run pwd() to see how your particular root path looks. 
+
+# Reproduce results from the paper
+In the terminal window, run the file "Paper_all_tests.jl" by typing >> julia Paper_all_tests.jl. 
+This should create all the relevant data.
 <!--
 # Coding principles
 Let's try to only implement what we need. No need for placeholders, we can always copy things when we need them
